@@ -4,7 +4,7 @@ import React, { useState, useTransition } from "react";
 import { 
   CheckCircle2, Circle, Filter, Plus, LogOut, 
   Trash2, Edit2, X, Save, AlertCircle, MessageSquare,
-  ChevronDown, ChevronRight
+  ChevronDown, ChevronRight, Menu
 } from "lucide-react";
 import { logout } from "../actions/auth";
 import { 
@@ -83,6 +83,7 @@ export default function DashboardContent({
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskTags, setNewTaskTags] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editingLogContent, setEditingLogContent] = useState("");
@@ -253,18 +254,29 @@ export default function DashboardContent({
 
   return (
     <div className="flex h-screen w-full bg-[#111111] text-[#ededed] overflow-hidden selection:bg-blue-500/30">
-      {/* SIDEBAR */}
-      <aside className="w-72 bg-[#1a1a1a] border-r border-[#333333] flex flex-col flex-shrink-0">
+      {/* SIDEBAR - Mobile Responsive */}
+      <aside className={cn(
+        "fixed inset-y-0 left-0 z-[70] w-72 bg-[#1a1a1a] border-r border-[#333333] flex flex-col flex-shrink-0 transition-transform duration-300 lg:relative lg:translate-x-0",
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
         <div className="p-6 border-b border-[#333333]/50 flex justify-between items-center">
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-white">Project Notes</h1>
             <p className="text-sm text-[#888888] mt-1 font-medium">seus projetos em foco</p>
           </div>
-          <form action={logout}>
-            <button type="submit" className="p-2 text-[#666666] hover:text-white hover:bg-[#333333] rounded-md transition-all">
-              <LogOut size={18} />
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setIsSidebarOpen(false)}
+              className="lg:hidden p-2 text-[#666] hover:text-white"
+            >
+              <X size={20} />
             </button>
-          </form>
+            <form action={logout}>
+              <button type="submit" className="p-2 text-[#666666] hover:text-white hover:bg-[#333333] rounded-md transition-all">
+                <LogOut size={18} />
+              </button>
+            </form>
+          </div>
         </div>
 
         <div className="p-4 flex-1 overflow-y-auto">
@@ -274,7 +286,7 @@ export default function DashboardContent({
               {initialProjects.map((project) => (
                 <div key={project.id} className="group relative">
                   <button 
-                    onClick={() => handleSelectProject(project.id)}
+                    onClick={() => { handleSelectProject(project.id); setIsSidebarOpen(false); }}
                     className={cn(
                       "w-full flex items-center justify-between px-2 py-2 rounded-md transition-colors text-left",
                       selectedProjectId === project.id ? "bg-[#2a2a2a] text-white" : "text-[#aaaaaa] hover:bg-[#2a2a2a]/50 hover:text-white"
@@ -312,15 +324,21 @@ export default function DashboardContent({
       <main className="flex-1 flex flex-col bg-[#141414]">
         {selectedProject ? (
           <>
-            <header className="border-b border-[#333333]/50 flex flex-col px-8 bg-[#141414]/80 backdrop-blur-md sticky top-0 z-10">
-              <div className="h-20 flex items-center justify-between">
+            <header className="border-b border-[#333333]/50 flex flex-col px-4 lg:px-8 bg-[#141414]/80 backdrop-blur-md sticky top-0 z-40">
+              <div className="h-16 lg:h-20 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <h2 className="text-2xl font-bold text-white tracking-tight">{selectedProject.name}</h2>
-                  <span className="px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full">ativo</span>
+                  <button 
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="lg:hidden p-2 text-[#666] hover:text-white"
+                  >
+                    <Menu size={24} />
+                  </button>
+                  <h2 className="text-lg lg:text-2xl font-bold text-white tracking-tight truncate max-w-[150px] lg:max-w-none">{selectedProject.name}</h2>
+                  <span className="hidden sm:inline-block px-3 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold rounded-full">ativo</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button className="px-4 py-2 bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.3)] text-white rounded-md text-sm font-medium transition-all flex items-center gap-2" onClick={() => { setEditingTask(null); setNewTaskTitle(""); setNewTaskTags(""); setIsTaskModalOpen(true); }}>
-                    <Plus size={16} /> Nova tarefa
+                  <button className="px-3 lg:px-4 py-2 bg-blue-600 hover:bg-blue-500 shadow-[0_0_15px_rgba(37,99,235,0.3)] text-white rounded-md text-xs lg:text-sm font-medium transition-all flex items-center gap-2" onClick={() => { setEditingTask(null); setNewTaskTitle(""); setNewTaskTags(""); setIsTaskModalOpen(true); }}>
+                    <Plus size={16} /> <span className="hidden sm:inline">Nova tarefa</span>
                   </button>
                 </div>
               </div>
@@ -457,8 +475,8 @@ export default function DashboardContent({
       {selectedTaskForDetail && (
         <div className="fixed inset-0 z-[60] flex justify-end">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setSelectedTaskForDetail(null)} />
-          <div className="relative w-full max-w-4xl bg-[#141414] border-l border-[#333] shadow-2xl flex flex-col slide-in-right overflow-hidden">
-            <header className="h-20 border-b border-[#333] px-8 flex items-center justify-between flex-shrink-0">
+          <div className="relative w-full lg:max-w-4xl bg-[#141414] lg:border-l border-[#333] shadow-2xl flex flex-col slide-in-right overflow-hidden">
+            <header className="h-16 lg:h-20 border-b border-[#333] px-4 lg:px-8 flex items-center justify-between flex-shrink-0 bg-[#181818]">
               <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setSelectedTaskForDetail(null)}
@@ -468,18 +486,18 @@ export default function DashboardContent({
                 </button>
                 <h2 className="text-xl font-bold text-white">Detalhes da Tarefa</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => openEditTask(selectedTaskForDetail)} className="px-4 py-2 bg-[#222] hover:bg-[#333] text-sm font-bold rounded-lg border border-[#333] flex items-center gap-2">
-                  <Edit2 size={14} /> Editar Base
+              <div className="flex items-center gap-2 lg:gap-3">
+                <button onClick={() => openEditTask(selectedTaskForDetail)} className="p-2 lg:px-4 lg:py-2 bg-[#222] hover:bg-[#333] text-sm font-bold rounded-lg border border-[#333] flex items-center gap-2 text-[#888] hover:text-white">
+                  <Edit2 size={14} /> <span className="hidden sm:inline">Editar Base</span>
                 </button>
                 <button 
                   onClick={() => { handleToggleTask(selectedTaskForDetail); setSelectedTaskForDetail(null); }} 
                   className={cn(
-                    "px-4 py-2 text-sm font-bold rounded-lg flex items-center gap-2",
+                    "px-3 lg:px-4 lg:py-2 text-xs lg:text-sm font-bold rounded-lg flex items-center gap-2",
                     selectedTaskForDetail.status === "completed" ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-600 text-white"
                   )}
                 >
-                  {selectedTaskForDetail.status === "completed" ? "Reabrir Tarefa" : "Concluir Tarefa"}
+                  <CheckCircle2 size={16} /> <span className="hidden sm:inline">{selectedTaskForDetail.status === "completed" ? "Reabrir" : "Concluir"}</span>
                 </button>
               </div>
             </header>
