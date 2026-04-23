@@ -15,10 +15,11 @@ export async function getTasks(projectId: string) {
   });
 }
 
-export async function createTask(projectId: string, title: string, tags: string[] = [], attachments: string[] = []) {
+export async function createTask(projectId: string, title: string, description: string = "", tags: string[] = [], attachments: string[] = []) {
   await prisma.task.create({
     data: {
       title,
+      description,
       projectId,
       tags,
       attachments,
@@ -35,10 +36,10 @@ export async function updateTaskStatus(id: string, status: string) {
   revalidatePath("/");
 }
 
-export async function updateTask(id: string, title: string, tags: string[]) {
+export async function updateTask(id: string, title: string, description: string, tags: string[]) {
   await prisma.task.update({
     where: { id },
-    data: { title, tags },
+    data: { title, description, tags },
   });
   revalidatePath("/");
 }

@@ -1,6 +1,8 @@
 import React from "react";
 import { getProjects } from "./actions/projects";
 import { getTasks } from "./actions/tasks";
+import { getNotes } from "./actions/notes";
+import { getTagConfigs } from "./actions/tags";
 import DashboardContent from "./components/DashboardContent";
 
 export default async function ProjectNotesPage({ 
@@ -9,15 +11,19 @@ export default async function ProjectNotesPage({
   searchParams: Promise<{ project?: string }> 
 }) {
   const projects = await getProjects();
+  const tagConfigs = await getTagConfigs();
   
   // Resolve searchParams promise
   const params = await searchParams;
   const selectedProjectId = params.project || projects[0]?.id;
   
   const tasks = selectedProjectId ? await getTasks(selectedProjectId) : [];
+  const notes = selectedProjectId ? await getNotes(selectedProjectId) : [];
 
   return (
     <DashboardContent 
+      initialNotes={notes}
+      tagConfigs={tagConfigs}
       initialProjects={projects.map(p => ({
         id: p.id,
         name: p.name,
@@ -27,6 +33,7 @@ export default async function ProjectNotesPage({
       initialTasks={tasks.map(t => ({
         id: t.id,
         title: t.title,
+        description: t.description,
         attachments: t.attachments,
         status: t.status,
         tags: t.tags,

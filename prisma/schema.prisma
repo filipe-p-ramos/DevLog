@@ -9,10 +9,11 @@ datasource db {
 }
 
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
+  id        String      @id @default(uuid())
+  email     String      @unique
   projects  Project[]
-  createdAt DateTime  @default(now())
+  tagConfigs TagConfig[]
+  createdAt DateTime    @default(now())
 }
 
 model Project {
@@ -23,6 +24,7 @@ model Project {
   userId    String
   user      User     @relation(fields: [userId], references: [id])
   tasks     Task[]
+  notes     Note[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -32,6 +34,7 @@ model Project {
 model Task {
   id          String   @id @default(uuid())
   title       String
+  description String?  // Descrição detalhada da tarefa
   attachments String[] @default([]) // URLs de imagens anexadas
   status      String   @default("pending") // pending, in_progress, completed
   tags        String[] // Array de tags (ex: design, backend)
@@ -54,4 +57,25 @@ model Log {
   createdAt   DateTime @default(now())
 
   @@index([taskId])
+}
+
+model TagConfig {
+  id      String @id @default(uuid())
+  name    String
+  color   String
+  userId  String
+  user    User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, name])
+}
+
+model Note {
+  id        String   @id @default(uuid())
+  content   String
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId])
 }

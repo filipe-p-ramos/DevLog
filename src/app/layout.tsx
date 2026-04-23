@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "DevLog - Seus projetos em foco",
+  title: "Project Notes - Seus projetos em foco",
   description: "Anotações do desenvolvimento de projetos e tracking de etapas.",
 };
 
