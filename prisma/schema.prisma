@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  projects  Project[]
+  createdAt DateTime  @default(now())
+}
+
+model Project {
+  id        String   @id @default(uuid())
+  name      String
+  color     String   @default("#000000") // Identificador visual
+  status    String   @default("active")  // active, archived
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  attachments String[] @default([]) // URLs de imagens anexadas
+  status      String   @default("pending") // pending, in_progress, completed
+  tags        String[] // Array de tags (ex: design, backend)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  logs        Log[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+}
+
+model Log {
+  id          String   @id @default(uuid())
+  content     String
+  attachments String[] @default([]) // URLs de imagens anexadas
+  type        String   @default("note") // note, blocker, decision, done
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@index([taskId])
+}
