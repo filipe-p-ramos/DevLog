@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronRight, Menu
 } from "lucide-react";
 import { logout } from "../actions/auth";
+import { createProject, updateProject, deleteProject } from "../actions/projects";
 import { 
   createTask, createLog, updateTaskStatus, 
   deleteTask, updateTask, updateLog, deleteLog 
