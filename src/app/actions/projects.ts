@@ -3,21 +3,13 @@
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 
-// Pegar ou criar usuário padrão para o sistema simples
-async function getDefaultUserId() {
-  const user = await prisma.user.findFirst();
-  if (user) return user.id;
-
-  const newUser = await prisma.user.create({
-    data: {
-      email: "user@projectnotes.local",
-    },
-  });
-  return newUser.id;
-}
+import { getUserId } from "./auth";
 
 export async function getProjects() {
+  const userId = await getUserId();
+  
   return await prisma.project.findMany({
+    where: { userId },
     include: {
       _count: {
         select: { tasks: { where: { status: { not: "completed" } } } },
@@ -28,7 +20,7 @@ export async function getProjects() {
 }
 
 export async function createProject(name: string, color: string = "#3b82f6") {
-  const userId = await getDefaultUserId();
+  const userId = await getUserId();
   await prisma.project.create({
     data: {
       name,

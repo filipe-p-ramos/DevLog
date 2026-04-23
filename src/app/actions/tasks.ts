@@ -2,8 +2,18 @@
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { getUserId } from "./auth";
 
 export async function getTasks(projectId: string) {
+  const userId = await getUserId();
+  
+  // Verificar se o projeto pertence ao usuário
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId }
+  });
+  
+  if (!project) return [];
+
   return await prisma.task.findMany({
     where: { projectId },
     include: {
@@ -16,6 +26,15 @@ export async function getTasks(projectId: string) {
 }
 
 export async function createTask(projectId: string, title: string, description: string = "", tags: string[] = [], attachments: string[] = []) {
+  const userId = await getUserId();
+
+  // Verificar posse
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId }
+  });
+
+  if (!project) throw new Error("Acesso negado");
+
   await prisma.task.create({
     data: {
       title,

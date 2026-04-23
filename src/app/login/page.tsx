@@ -24,6 +24,21 @@ export default function LoginPage() {
         </div>
 
         <form action={action} className="bg-[#1a1a1a] border border-[#333333] rounded-2xl p-8 shadow-2xl">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-[#aaaaaa] mb-2" htmlFor="username">
+              Nome de Usuário
+            </label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              autoFocus
+              required
+              className="w-full bg-[#111111] border border-[#333333] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 rounded-xl px-4 py-3 text-white placeholder-[#555] transition-all outline-none"
+              placeholder="Usuário"
+            />
+          </div>
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-[#aaaaaa] mb-2" htmlFor="password">
               Senha de Acesso
@@ -32,7 +47,6 @@ export default function LoginPage() {
               type="password"
               id="password"
               name="password"
-              autoFocus
               required
               className="w-full bg-[#111111] border border-[#333333] focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 rounded-xl px-4 py-3 text-white placeholder-[#555] transition-all outline-none"
               placeholder="••••••••"
