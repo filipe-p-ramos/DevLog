@@ -9,7 +9,7 @@ import {
 import { logout } from "../actions/auth";
 import { 
   createTask, createLog, updateTaskStatus, 
-  deleteTask, updateTask 
+  deleteTask, updateTask, updateLog, deleteLog 
 } from "../actions/tasks";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -82,6 +82,10 @@ export default function DashboardContent({
   const [newProjectName, setNewProjectName] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskTags, setNewTaskTags] = useState("");
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editingLogContent, setEditingLogContent] = useState("");
   
   const [isPending, startTransition] = useTransition();
 
@@ -182,6 +186,20 @@ export default function DashboardContent({
     });
   };
 
+  const handleUpdateLog = (id: string) => {
+    startTransition(async () => {
+      await updateLog(id, editingLogContent);
+      setEditingLogId(null);
+    });
+  };
+
+  const handleDeleteLog = (id: string) => {
+    if (!confirm("Excluir este andamento?")) return;
+    startTransition(async () => {
+      await deleteLog(id);
+    });
+  };
+
   const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>, callback: (url: string) => void) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
@@ -212,12 +230,10 @@ export default function DashboardContent({
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-3 mt-2">
             {attachments.map((url, i) => (
-              <a 
+              <button 
                 key={i} 
-                href={url} 
-                target="_blank" 
-                rel="noreferrer" 
-                className="group relative block w-32 h-32 border border-[#333] rounded-xl overflow-hidden hover:border-blue-500 transition-all shadow-lg bg-black"
+                onClick={(e) => { e.stopPropagation(); setPreviewImage(url); }}
+                className="group relative block w-32 h-32 border border-[#333] rounded-xl overflow-hidden hover:border-blue-500 transition-all shadow-lg bg-black text-left"
               >
                 <img 
                   src={url} 
@@ -227,7 +243,7 @@ export default function DashboardContent({
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                   <Plus size={20} className="text-white" />
                 </div>
-              </a>
+              </button>
             ))}
           </div>
         )}
@@ -497,14 +513,47 @@ export default function DashboardContent({
                     {selectedTaskForDetail.logs.map((log) => (
                       <div key={log.id} className="bg-[#1a1a1a] border border-[#222] rounded-xl p-5 shadow-sm group hover:border-[#333] transition-all">
                         <div className="flex justify-between items-start mb-3">
-                          <div className={cn("px-2 py-0.5 rounded text-[9px] font-bold uppercase", log.type === "blocker" ? "bg-red-500/20 text-red-400" : "bg-blue-500/20 text-blue-400")}>
-                            {log.type === "blocker" ? "Bloqueio" : "Nota"}
+                          <div className="flex items-center gap-3">
+                            <div className={cn("px-2 py-0.5 rounded text-[9px] font-bold uppercase", log.type === "blocker" ? "bg-red-500/20 text-red-400" : "bg-blue-500/20 text-blue-400")}>
+                              {log.type === "blocker" ? "Bloqueio" : "Nota"}
+                            </div>
+                            <span className="text-[10px] font-bold text-[#444]">{new Date(log.createdAt).toLocaleString()}</span>
                           </div>
-                          <span className="text-[10px] font-bold text-[#444]">{new Date(log.createdAt).toLocaleString()}</span>
+                          
+                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                            <button 
+                              onClick={() => { setEditingLogId(log.id); setEditingLogContent(log.content); }}
+                              className="p-1 text-[#555] hover:text-blue-400 transition-colors"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteLog(log.id)}
+                              className="p-1 text-[#555] hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="text-[#ddd]">
-                          {renderContent(log.content, log.attachments)}
-                        </div>
+
+                        {editingLogId === log.id ? (
+                          <div className="space-y-3">
+                            <textarea 
+                              autoFocus
+                              className="w-full bg-[#111] border border-blue-500/50 rounded-lg p-3 text-sm text-white focus:outline-none min-h-[100px]"
+                              value={editingLogContent}
+                              onChange={(e) => setEditingLogContent(e.target.value)}
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button onClick={() => setEditingLogId(null)} className="px-3 py-1 text-[10px] font-bold uppercase text-[#555] hover:text-white transition-colors">Cancelar</button>
+                              <button onClick={() => handleUpdateLog(log.id)} className="px-3 py-1 text-[10px] font-bold uppercase bg-blue-600 text-white rounded-md hover:bg-blue-500 transition-colors">Salvar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[#ddd]">
+                            {renderContent(log.content, log.attachments)}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -572,7 +621,7 @@ export default function DashboardContent({
 
       {/* MODALS */}
       {(isProjectModalOpen || editingProject) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-[#1a1a1a] border border-[#333333] w-full max-w-md rounded-2xl p-8 shadow-2xl scale-in-center">
             <h2 className="text-2xl font-bold mb-6">{editingProject ? "Editar Projeto" : "Novo Projeto"}</h2>
             <div className="space-y-4">
@@ -602,7 +651,7 @@ export default function DashboardContent({
       )}
 
       {isTaskModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="bg-[#1a1a1a] border border-[#333333] w-full max-w-md rounded-2xl p-8 shadow-2xl">
             <h2 className="text-2xl font-bold mb-6">{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</h2>
             <div className="space-y-4">
@@ -653,6 +702,23 @@ export default function DashboardContent({
               </div>
             </div>
           </div>
+        </div>
+      )}
+      {/* LIGHTBOX / MODAL DE IMAGEM */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button className="absolute top-6 right-6 text-white/50 hover:text-white p-2 bg-white/10 rounded-full transition-all">
+            <X size={32} />
+          </button>
+          <img 
+            src={previewImage} 
+            className="max-w-full max-h-full object-contain shadow-2xl rounded-lg scale-in-center" 
+            alt="Preview" 
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

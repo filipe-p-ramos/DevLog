@@ -61,3 +61,18 @@ export async function createLog(taskId: string, content: string, type: string = 
   });
   revalidatePath("/");
 }
+
+export async function updateLog(id: string, content: string) {
+  await prisma.log.update({
+    where: { id },
+    data: { content },
+  });
+  revalidatePath("/");
+}
+
+export async function deleteLog(id: string) {
+  await prisma.log.delete({
+    where: { id },
+  });
+  revalidatePath("/");
+}
