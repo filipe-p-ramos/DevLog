@@ -145,6 +145,7 @@ export default function DashboardContent({
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [isPending, startTransition] = useTransition();
 
   // Persistência de Tema
   useEffect(() => {
@@ -194,8 +195,6 @@ export default function DashboardContent({
       await updateTagColor(tag, color);
     });
   };
-
-  const [isPending, startTransition] = useTransition();
 
   const handleLogout = () => {
     startTransition(async () => {
