@@ -4,10 +4,10 @@ import React, { useState, useTransition, useEffect } from "react";
 import {
   CheckCircle2, Circle, Filter, Plus, LogOut,
   Trash2, Edit2, X, Save, AlertCircle, MessageSquare,
-  ChevronDown, ChevronRight, Menu, Sun, Moon
+  ChevronUp, ChevronDown, ChevronRight, Menu, Sun, Moon, Search, List, LayoutGrid
 } from "lucide-react";
 import { logout } from "../actions/auth";
-import { createProject, updateProject, deleteProject } from "../actions/projects";
+import { createProject, updateProject, deleteProject, reorderProjects } from "../actions/projects";
 import {
   createTask, createLog, updateTaskStatus,
   deleteTask, updateTask, updateLog, deleteLog
@@ -82,7 +82,7 @@ export default function DashboardContent({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const selectedProjectId = currentProjectId || initialProjects[0]?.id;
+  const selectedProjectId = currentProjectId;
 
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -145,14 +145,21 @@ export default function DashboardContent({
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [isPending, startTransition] = useTransition();
 
-  // Persistência de Tema
+  // Persistência de Tema e Visualização
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
     if (savedTheme) {
       setTheme(savedTheme);
       document.documentElement.classList.toggle('theme-light', savedTheme === 'light');
+    }
+
+    const savedViewMode = localStorage.getItem('viewMode') as 'card' | 'list';
+    if (savedViewMode) {
+      setViewMode(savedViewMode);
     }
   }, []);
 
@@ -161,6 +168,11 @@ export default function DashboardContent({
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
     document.documentElement.classList.toggle('theme-light', newTheme === 'light');
+  };
+
+  const handleToggleViewMode = (mode: 'card' | 'list') => {
+    setViewMode(mode);
+    localStorage.setItem('viewMode', mode);
   };
 
   const handleCreateNote = () => {
@@ -207,11 +219,19 @@ export default function DashboardContent({
   // Extrair todas as tags únicas para sugestões
   const allUniqueTags = Array.from(new Set(initialTasks.flatMap(t => t.tags))).sort();
 
-  // Filtrar tarefas por tag e status
+  // Filtrar tarefas por tag, status e busca
   const tasks = initialTasks.filter(t => {
     const matchesTag = !selectedTag || t.tags.includes(selectedTag);
     const matchesStatus = t.status === statusFilter;
-    return matchesTag && matchesStatus;
+    
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !searchQuery || 
+      t.title.toLowerCase().includes(query) ||
+      (t.description || "").toLowerCase().includes(query) ||
+      t.logs.some(l => l.content.toLowerCase().includes(query)) ||
+      t.tags.some(tag => tag.toLowerCase().includes(query));
+
+    return matchesTag && matchesStatus && matchesSearch;
   });
 
   const handleSelectProject = (id: string) => {
@@ -322,6 +342,24 @@ export default function DashboardContent({
     });
   };
 
+  const handleMoveProject = (id: string, direction: 'up' | 'down') => {
+    const currentIndex = initialProjects.findIndex(p => p.id === id);
+    if (currentIndex === -1) return;
+    
+    const newProjects = [...initialProjects];
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    if (newIndex < 0 || newIndex >= newProjects.length) return;
+    
+    // Swap
+    [newProjects[currentIndex], newProjects[newIndex]] = [newProjects[newIndex], newProjects[currentIndex]];
+    
+    const projectIds = newProjects.map(p => p.id);
+    startTransition(async () => {
+      await reorderProjects(projectIds);
+    });
+  };
+
   const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>, callback: (url: string) => void) => {
     const items = e.clipboardData.items;
     for (let i = 0; i < items.length; i++) {
@@ -338,6 +376,21 @@ export default function DashboardContent({
         }
       }
     }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        const url = await uploadAttachment(file);
+        callback(url);
+      } catch (err) {
+        console.error("Erro ao subir imagem:", err);
+        alert("Erro ao subir imagem");
+      }
+    }
+    // Reseta o valor para permitir subir a mesma imagem novamente se necessário
+    e.target.value = "";
   };
 
   const renderContent = (content: string, attachments: string[] = []) => {
@@ -382,8 +435,17 @@ export default function DashboardContent({
       )}>
         <div className="p-6 border-b border-[var(--border)]/50 flex justify-between items-center">
           <div>
+          <button 
+            onClick={() => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("project");
+              router.push(`/?${params.toString()}`);
+            }}
+            className="text-left hover:opacity-80 transition-opacity"
+          >
             <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">Project Notes</h1>
             <p className="text-sm text-[#888888] mt-1 font-medium">seus projetos em foco</p>
+          </button>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -438,7 +500,22 @@ export default function DashboardContent({
                       </span>
                     </div>
                   </button>
-                  <div className="absolute right-10 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1">
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-[var(--surface)] p-1 rounded-lg shadow-xl border border-[var(--border)]">
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'up'); }} 
+                      disabled={initialProjects.indexOf(project) === 0}
+                      className="p-1 hover:text-[var(--accent)] disabled:opacity-20"
+                    >
+                      <ChevronUp size={14} />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'down'); }} 
+                      disabled={initialProjects.indexOf(project) === initialProjects.length - 1}
+                      className="p-1 hover:text-[var(--accent)] disabled:opacity-20"
+                    >
+                      <ChevronDown size={14} />
+                    </button>
+                    <div className="w-px h-3 bg-[var(--border)] mx-1" />
                     <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); setNewProjectName(project.name); }} className="p-1 hover:text-blue-400"><Edit2 size={12} /></button>
                     <button onClick={(e) => handleDeleteProject(project.id, e)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
                   </div>
@@ -487,6 +564,28 @@ export default function DashboardContent({
                   )}
                 </div>
                 <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1 shadow-sm">
+                    <button
+                      onClick={() => handleToggleViewMode('card')}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        viewMode === 'card' ? "bg-[var(--accent)] text-[var(--background)] shadow-md" : "text-[#666] hover:text-[var(--foreground)]"
+                      )}
+                      title="Modo Card"
+                    >
+                      <LayoutGrid size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleToggleViewMode('list')}
+                      className={cn(
+                        "p-1.5 rounded-lg transition-all",
+                        viewMode === 'list' ? "bg-[var(--accent)] text-[var(--background)] shadow-md" : "text-[#666] hover:text-[var(--foreground)]"
+                      )}
+                      title="Modo Lista"
+                    >
+                      <List size={18} />
+                    </button>
+                  </div>
                   <button
                     onClick={toggleTheme}
                     className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-all shadow-sm active:scale-95"
@@ -544,7 +643,7 @@ export default function DashboardContent({
               )}
 
               {/* Status Tabs */}
-              <div className="mt-4 flex items-center gap-6 border-b border-[#333]/50 pb-px">
+              <div className="mt-4 flex items-center justify-start border-b border-[#333]/50 pb-px gap-8">
                 <button
                   onClick={() => setStatusFilter("pending")}
                   className={cn(
@@ -565,6 +664,28 @@ export default function DashboardContent({
                   Concluídas
                   {statusFilter === "completed" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
                 </button>
+
+                {/* Busca colada às abas com gap-8 */}
+                <div className="relative group mb-2 w-full max-w-xs sm:max-w-md">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#666] group-focus-within:text-[var(--accent)] transition-colors">
+                    <Search size={14} />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Buscar tarefas..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-8 py-1.5 bg-[var(--sidebar)] border border-[var(--border)] rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all shadow-inner"
+                  />
+                  {searchQuery && (
+                    <button 
+                      onClick={() => setSearchQuery("")}
+                      className="absolute inset-y-0 right-0 pr-2 flex items-center text-[#666] hover:text-[var(--foreground)]"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
             </header>
 
@@ -600,7 +721,8 @@ export default function DashboardContent({
                               onClick={() => setSelectedTaskForDetail(task)}
                               className={cn(
                                 "bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden shadow-lg transition-all duration-300 group cursor-pointer hover:bg-[var(--surface-hover)] relative",
-                                task.status === "completed" ? "opacity-60" : ""
+                                task.status === "completed" ? "opacity-60" : "",
+                                viewMode === 'list' ? "p-3" : "p-4"
                               )}
                               style={{
                                 borderLeft: `3px solid ${task.status === 'completed' ? '#444' : (theme === 'light' ? 'var(--accent)' : selectedProject.color)}`,
@@ -611,30 +733,39 @@ export default function DashboardContent({
                                 className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none"
                                 style={{ background: `radial-gradient(circle at center, ${selectedProject.color}, transparent 70%)` }}
                               />
-                              <div className="p-4 flex items-start gap-4">
+                              <div className={cn("flex items-start", viewMode === 'list' ? "gap-3" : "gap-4")}>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleToggleTask(task); }}
-                                  className={cn("mt-1 flex-shrink-0 transition-colors", task.status === "completed" ? "text-emerald-500" : "text-[#555] hover:text-[var(--accent)]")}
+                                  className={cn("flex-shrink-0 transition-colors", 
+                                    viewMode === 'list' ? "mt-0.5" : "mt-1",
+                                    task.status === "completed" ? "text-emerald-500" : "text-[#555] hover:text-[var(--accent)]"
+                                  )}
                                 >
-                                  {task.status === "completed" ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                                  {task.status === "completed" ? <CheckCircle2 size={viewMode === 'list' ? 18 : 20} /> : <Circle size={viewMode === 'list' ? 18 : 20} />}
                                 </button>
 
                                 <div className="flex-1 min-w-0">
-                                  <div className={cn("text-lg font-semibold leading-tight break-words mb-1", task.status === "completed" ? "text-[#888] line-through" : "text-[var(--foreground)]")}>
-                                    {renderContent(task.title, task.attachments)}
+                                  <div className="flex items-center justify-between gap-4">
+                                    <div className={cn(
+                                      "font-semibold leading-tight break-words", 
+                                      task.status === "completed" ? "text-[#888] line-through" : "text-[var(--foreground)]",
+                                      viewMode === 'list' ? "text-sm" : "text-lg mb-1"
+                                    )}>
+                                      {viewMode === 'list' ? task.title : renderContent(task.title, task.attachments)}
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                                      <button onClick={(e) => { e.stopPropagation(); openEditTask(task); }} className="p-1.5 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--accent)]/20 bg-[var(--background)] rounded-md transition-all"><Edit2 size={12} /></button>
+                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="p-1.5 text-[#888] hover:text-red-500 hover:bg-red-600/20 bg-[var(--background)] rounded-md transition-all"><Trash2 size={12} /></button>
+                                    </div>
                                   </div>
-                                  {task.description && (
+
+                                  {viewMode === 'card' && task.description && (
                                     <p className="text-xs text-[var(--foreground)] opacity-70 line-clamp-2 leading-relaxed font-medium">
                                       {task.description}
                                     </p>
                                   )}
-                                  <div className="flex items-center gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
-                                    <button onClick={(e) => { e.stopPropagation(); openEditTask(task); }} className="p-1.5 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--accent)]/20 bg-[var(--background)] rounded-md transition-all"><Edit2 size={12} /></button>
-                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="p-1.5 text-[#888] hover:text-red-500 hover:bg-red-600/20 bg-[var(--background)] rounded-md transition-all"><Trash2 size={12} /></button>
-                                  </div>
 
-
-                                  {lastLog && (
+                                  {viewMode === 'card' && lastLog && (
                                     <div className="mt-2 flex items-center gap-2 text-[#888]">
                                       <MessageSquare size={12} className="flex-shrink-0" />
                                       <p className="text-xs truncate italic">
@@ -643,14 +774,20 @@ export default function DashboardContent({
                                     </div>
                                   )}
 
-                                  <div className="mt-3 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
+                                  <div className={cn("flex items-center justify-between", viewMode === 'list' ? "mt-1.5" : "mt-3")}>
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      {task.attachments.length > 0 && viewMode === 'list' && (
+                                        <Plus size={12} className="text-[var(--accent)]" title="Possui anexos" />
+                                      )}
                                       {task.tags.map(tag => {
                                         const tagColor = getTagColor(tag);
                                         return (
                                           <span
                                             key={tag}
-                                            className="px-2.5 py-0.5 text-[10px] font-black rounded-full uppercase border transition-all"
+                                            className={cn(
+                                              "font-black rounded-full uppercase border transition-all truncate",
+                                              viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-2.5 py-0.5 text-[10px]"
+                                            )}
                                             style={{
                                               backgroundColor: `${tagColor}15`,
                                               color: tagColor,
@@ -662,14 +799,25 @@ export default function DashboardContent({
                                         );
                                       })}
                                     </div>
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 flex-shrink-0">
                                       <span
-                                        className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1"
-                                        style={{ color: logCount > 0 ? selectedProject.color : '#555' }}
+                                        className={cn(
+                                          "font-bold uppercase tracking-widest flex items-center gap-1.5 px-2 py-0.5 rounded border transition-all",
+                                          viewMode === 'list' 
+                                            ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)] shadow-sm" 
+                                            : "text-[10px]"
+                                        )}
+                                        style={{ 
+                                          color: logCount > 0 ? (theme === 'light' ? 'var(--accent)' : selectedProject.color) : '#666',
+                                          borderColor: logCount > 0 ? (theme === 'light' ? 'var(--accent)40' : `${selectedProject.color}40`) : 'transparent'
+                                        }}
                                       >
-                                        <MessageSquare size={10} /> {logCount} {logCount === 1 ? 'Log' : 'Logs'}
+                                        <MessageSquare size={viewMode === 'list' ? 10 : 11} /> {logCount} {logCount === 1 ? 'Andamento' : 'Andamentos'}
                                       </span>
-                                      <span className="text-[10px] font-bold text-[var(--accent)] bg-[var(--accent)]/10 px-2 py-0.5 rounded border border-[var(--accent)]/20 shadow-sm">
+                                      <span className={cn(
+                                        "font-bold text-[var(--accent)] bg-[var(--accent)]/10 rounded border border-[var(--accent)]/20 shadow-sm",
+                                        viewMode === 'list' ? "px-1.5 py-0 text-[9px]" : "px-2 py-0.5 text-[10px]"
+                                      )}>
                                         {new Date(task.createdAt).toLocaleDateString()}
                                       </span>
                                     </div>
@@ -761,9 +909,46 @@ export default function DashboardContent({
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center flex-col opacity-30">
-            <AlertCircle size={48} className="mb-4" />
-            <p className="text-xl font-medium">Nenhum projeto selecionado</p>
+          <div className="flex-1 flex items-center justify-center bg-[var(--background)] p-8">
+            <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-500">
+              <div className="relative inline-block">
+                <div className="absolute inset-0 bg-[var(--accent)]/20 blur-3xl rounded-full" />
+                <div className="relative w-24 h-24 bg-[var(--surface)] border border-[var(--border)] rounded-[32px] flex items-center justify-center mx-auto shadow-2xl mb-6">
+                  <LayoutGrid size={40} className="text-[var(--accent)]" />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-3xl font-black text-[var(--foreground)] mb-3 tracking-tight">Project Notes</h2>
+                <p className="text-[#888] font-medium leading-relaxed">
+                  Bem-vindo de volta! Selecione um projeto na barra lateral para começar a gerenciar suas tarefas e notas, ou crie um novo.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group">
+                  <div className="w-10 h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Plus size={20} className="text-[var(--accent)]" />
+                  </div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">Novo Projeto</h3>
+                  <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Crie seu workspace</p>
+                </div>
+                <div className="p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group">
+                  <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Search size={20} className="text-emerald-500" />
+                  </div>
+                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">Localizar</h3>
+                  <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Busque em tudo</p>
+                </div>
+              </div>
+              
+              {initialProjects.length === 0 && (
+                <button
+                  onClick={() => setIsProjectModalOpen(true)}
+                  className="mt-8 px-8 py-4 bg-[var(--accent)] text-[var(--background)] font-black uppercase text-xs rounded-2xl shadow-[0_10px_20px_var(--accent-30)] hover:scale-105 active:scale-95 transition-all tracking-widest"
+                >
+                  Começar Agora
+                </button>
+              )}
+            </div>
           </div>
         )}
       </main>
@@ -934,34 +1119,46 @@ export default function DashboardContent({
                   </div>
                 )}
 
-                <div className="relative group">
-                  <textarea
-                    placeholder="Descreva o andamento... Cole prints (Ctrl+V) 📋"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        const content = e.currentTarget.value;
-                        const target = e.currentTarget;
-                        if (!content && tempLogAttachments.length === 0) return;
-
-                        startTransition(async () => {
-                          await createLog(selectedTaskForDetail.id, content, "note", tempLogAttachments);
-                          target.value = "";
-                          setTempLogAttachments([]);
-                        });
-                      }
-                    }}
-                    onPaste={(e) => {
-                      handlePaste(e, (url) => {
-                        setTempLogAttachments(prev => [...prev, url]);
-                      });
-                    }}
-                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-5 py-4 text-[15px] text-[var(--foreground)] placeholder-[#444] focus:outline-none focus:border-[var(--accent)] transition-all resize-none min-h-[120px]"
-                  />
-                  <div className="absolute bottom-4 right-4 text-[10px] font-bold text-[#444] uppercase pointer-events-none group-hover:text-[#666] transition-all">
-                    Pressione ENTER para registrar
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] font-bold text-[#666] uppercase tracking-[0.2em]">Novo Andamento</p>
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
+                      <Plus size={14} /> Anexar Imagem
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileChange(e, (url) => setTempLogAttachments(prev => [...prev, url]))}
+                      />
+                    </label>
                   </div>
-                </div>
+                  <div className="relative group">
+                    <textarea
+                      placeholder="Descreva o andamento... Cole prints (Ctrl+V) 📋"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          const content = e.currentTarget.value;
+                          const target = e.currentTarget;
+                          if (!content && tempLogAttachments.length === 0) return;
+
+                          startTransition(async () => {
+                            await createLog(selectedTaskForDetail.id, content, "note", tempLogAttachments);
+                            target.value = "";
+                            setTempLogAttachments([]);
+                          });
+                        }
+                      }}
+                      onPaste={(e) => {
+                        handlePaste(e, (url) => {
+                          setTempLogAttachments(prev => [...prev, url]);
+                        });
+                      }}
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-5 py-4 text-[15px] text-[var(--foreground)] placeholder-[#444] focus:outline-none focus:border-[var(--accent)] transition-all resize-none min-h-[120px]"
+                    />
+                    <div className="absolute bottom-4 right-4 text-[10px] font-bold text-[#444] uppercase pointer-events-none group-hover:text-[#666] transition-all">
+                      Pressione ENTER para registrar o andamento
+                    </div>
+                  </div>
               </div>
             </footer>
           </div>
@@ -1005,20 +1202,31 @@ export default function DashboardContent({
             <h2 className="text-2xl font-bold mb-6">{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#888] mb-1">Título da Tarefa</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-[#888]">Título da Tarefa</label>
+                  <label className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
+                    <Plus size={14} /> Anexar Foto
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e, (url) => setTempTaskAttachments(prev => [...prev, url]))}
+                    />
+                  </label>
+                </div>
                 {tempTaskAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {tempTaskAttachments.map((url, i) => (
                       <div key={i} className="relative group">
-                        <img src={url} className="w-12 h-12 object-cover rounded-md border border-[#333]" />
-                        <button onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={8} /></button>
+                        <img src={url} className="w-14 h-14 object-cover rounded-xl border border-[#333] hover:border-[var(--accent)] transition-all" />
+                        <button onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
                       </div>
                     ))}
                   </div>
                 )}
                 <textarea
                   autoFocus
-                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg px-4 py-3 outline-none focus:border-[var(--accent)] resize-none min-h-[80px]"
+                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 outline-none focus:border-[var(--accent)] resize-none min-h-[80px] transition-all"
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   onPaste={(e) => {

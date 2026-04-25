@@ -15,8 +15,27 @@ export async function getProjects() {
         select: { tasks: { where: { status: { not: "completed" } } } },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [
+      { order: "asc" },
+      { createdAt: "desc" }
+    ],
   });
+}
+
+export async function reorderProjects(projectIds: string[]) {
+  const userId = await getUserId();
+  
+  // Atualização em batch para garantir performance
+  await Promise.all(
+    projectIds.map((id, index) => 
+      prisma.project.update({
+        where: { id, userId },
+        data: { order: index }
+      })
+    )
+  );
+  
+  revalidatePath("/");
 }
 
 export async function createProject(name: string, color: string = "#3b82f6") {

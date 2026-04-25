@@ -15,7 +15,7 @@ export default async function ProjectNotesPage({
   
   // Resolve searchParams promise
   const params = await searchParams;
-  const selectedProjectId = params.project || projects[0]?.id;
+  const selectedProjectId = params.project;
   
   const tasks = selectedProjectId ? await getTasks(selectedProjectId) : [];
   const notes = selectedProjectId ? await getNotes(selectedProjectId) : [];

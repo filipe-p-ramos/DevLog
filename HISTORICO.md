@@ -30,6 +30,20 @@ A base de dados será orquestrada via schema prisma:
 - [x] Criação do boilerplate Next.js
 - [x] Instalação e configuração inicial Prisma ORM
 - [x] Rascunho inicial do esquema do Banco de Dados
-- [ ] Configuração do Supabase (Database/Auth)
-- [ ] Implementação de Estrutura de Componentes Base (Sidebar, Listas, LogCards)
-- [ ] Criação de Actions e Fluxos de CRUD
+- [x] Configuração do Supabase (Database/Auth)
+- [x] Implementação de Estrutura de Componentes Base (Sidebar, Listas, LogCards)
+- [x] Criação de Actions e Fluxos de CRUD
+- [x] Implementação de Busca por Palavras-Chave (Título, Descrição e Logs)
+
+---
+## Diário de Bordo (Incrementos Estáveis)
+
+### 24/04/2026 - Implementação de Busca e Modos de Visualização
+- **Funcionalidade:** Adicionado campo de busca inteligente e alternador de visualização (Modo Card vs. Modo Lista).
+- **Técnica:** 
+    - Filtragem no lado do cliente para busca instantânea.
+    - Estado de UI para alternar entre componentes de renderização de tarefas (Card/Lista).
+- **Design:** 
+    - Modo Lista: Compacto, otimizado para alta densidade de informação (estilo Windows Explorer).
+    - Modo Card: Visual rico com foco em mídia e logs detalhados.
+    - Controles integrados no header com ícones `lucide-react`.
