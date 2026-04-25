@@ -777,7 +777,9 @@ export default function DashboardContent({
                                   <div className={cn("flex items-center justify-between", viewMode === 'list' ? "mt-1.5" : "mt-3")}>
                                     <div className="flex items-center gap-2 overflow-hidden">
                                       {task.attachments.length > 0 && viewMode === 'list' && (
-                                        <Plus size={12} className="text-[var(--accent)]" title="Possui anexos" />
+                                        <span title="Possui anexos">
+                                          <Plus size={12} className="text-[var(--accent)]" />
+                                        </span>
                                       )}
                                       {task.tags.map(tag => {
                                         const tagColor = getTagColor(tag);

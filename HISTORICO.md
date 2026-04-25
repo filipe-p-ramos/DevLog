@@ -36,9 +36,15 @@ A base de dados será orquestrada via schema prisma:
 - [x] Implementação de Busca por Palavras-Chave (Título, Descrição e Logs)
 
 ---
-## Diário de Bordo (Incrementos Estáveis)
+## Histórico de Evolução - Project Notes
 
-### 24/04/2026 - Implementação de Busca e Modos de Visualização
+## [2026-04-25] - Correção de Build (Vercel)
+- **Correção de Tipagem (TypeScript):** Resolvido erro de compilação no Vercel onde a propriedade `title` estava sendo passada diretamente para o componente `Plus` da Lucide React.
+  - *Causa:* Componentes Lucide não aceitam `title` nativamente em suas props.
+  - *Solução:* O ícone foi envolvido em um elemento `<span>` com o atributo `title`, preservando o tooltip de acessibilidade sem violar as regras de tipagem.
+- **Auditoria de Build:** Verificado o restante do arquivo `DashboardContent.tsx` e `page.tsx` para garantir que outros `title` estejam aplicados apenas a elementos HTML nativos (`button`, `input`).
+
+## [2026-04-25] - Sistema de Reordenamento e Initial State Modos de Visualização
 - **Funcionalidade:** Adicionado campo de busca inteligente e alternador de visualização (Modo Card vs. Modo Lista).
 - **Técnica:** 
     - Filtragem no lado do cliente para busca instantânea.
