@@ -18,10 +18,10 @@ export async function getTasks(projectId: string) {
     where: { projectId },
     include: {
       logs: {
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: "asc" },
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: { updatedAt: "desc" },
   });
 }
 
@@ -71,28 +71,50 @@ export async function deleteTask(id: string) {
 }
 
 export async function createLog(taskId: string, content: string, type: string = "note", attachments: string[] = []) {
-  await prisma.log.create({
-    data: {
-      content,
-      type,
-      taskId,
-      attachments,
-    },
-  });
+  console.log(`[DEBUG] createLog chamada para taskId: ${taskId}`);
+
+  await prisma.$transaction([
+    prisma.log.create({
+      data: {
+        content,
+        type,
+        taskId,
+        attachments,
+      },
+    }),
+    prisma.task.update({
+      where: { id: taskId },
+      data: { updatedAt: new Date() },
+    }),
+  ]);
   revalidatePath("/");
 }
 
 export async function updateLog(id: string, content: string) {
-  await prisma.log.update({
+  const log = await prisma.log.update({
     where: { id },
     data: { content },
+    select: { taskId: true },
   });
+  
+  await prisma.task.update({
+    where: { id: log.taskId },
+    data: { updatedAt: new Date() },
+  });
+
   revalidatePath("/");
 }
 
 export async function deleteLog(id: string) {
-  await prisma.log.delete({
+  const log = await prisma.log.delete({
     where: { id },
+    select: { taskId: true },
   });
+
+  await prisma.task.update({
+    where: { id: log.taskId },
+    data: { updatedAt: new Date() },
+  });
+
   revalidatePath("/");
 }

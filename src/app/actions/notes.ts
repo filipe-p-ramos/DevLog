@@ -16,7 +16,7 @@ export async function getNotes(projectId: string) {
 
   return await prisma.note.findMany({
     where: { projectId },
-    orderBy: { createdAt: "desc" },
+    orderBy: { updatedAt: "desc" },
   });
 }
 

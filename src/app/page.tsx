@@ -1,4 +1,6 @@
 import React from "react";
+export const dynamic = "force-dynamic";
+
 import { getProjects } from "./actions/projects";
 import { getTasks } from "./actions/tasks";
 import { getNotes } from "./actions/notes";

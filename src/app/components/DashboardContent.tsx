@@ -4,8 +4,10 @@ import React, { useState, useTransition, useEffect } from "react";
 import {
   CheckCircle2, Circle, Filter, Plus, LogOut,
   Trash2, Edit2, X, Save, AlertCircle, MessageSquare,
-  ChevronUp, ChevronDown, ChevronRight, Menu, Sun, Moon, Search, List, LayoutGrid
+  ChevronUp, ChevronDown, ChevronRight, Menu, Sun, Moon, Search, List, LayoutGrid,
+  FileText, FileCode, File, Download
 } from "lucide-react";
+
 import { logout } from "../actions/auth";
 import { createProject, updateProject, deleteProject, reorderProjects } from "../actions/projects";
 import {
@@ -393,7 +395,39 @@ export default function DashboardContent({
     e.target.value = "";
   };
 
+  const isImage = (url: string) => {
+    const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext || '');
+  };
+
+  const getFileIcon = (url: string) => {
+    const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+    if (ext === 'pdf') return <FileText size={32} className="text-red-400" />;
+    if (['xml', 'html', 'json'].includes(ext || '')) return <FileCode size={32} className="text-blue-400" />;
+    if (['csv', 'txt'].includes(ext || '')) return <FileText size={32} className="text-emerald-400" />;
+    return <File size={32} className="text-[#888]" />;
+  };
+
+  const handleDownload = async (url: string) => {
+    const fileName = url.split('/').pop()?.split('?')[0] || 'arquivo';
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      window.open(url, '_blank');
+    }
+  };
+
   const renderContent = (content: string, attachments: string[] = []) => {
+
     return (
       <div className="space-y-3">
         {content && (
@@ -404,27 +438,53 @@ export default function DashboardContent({
 
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-3 mt-2">
-            {attachments.map((url, i) => (
-              <button
-                key={i}
-                onClick={(e) => { e.stopPropagation(); setPreviewImage(url); }}
-                className="group relative block w-32 h-32 border border-[var(--border)] rounded-xl overflow-hidden hover:border-[var(--accent)] transition-all shadow-lg bg-[var(--sidebar)] text-left"
-              >
-                <img
-                  src={url}
-                  alt="attachment"
-                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Plus size={20} className="text-white" />
-                </div>
-              </button>
-            ))}
+            {attachments.map((url, i) => {
+              const isImg = isImage(url);
+              const fileName = url.split('/').pop()?.split('.').slice(0, -1).join('.') || 'anexo';
+              const fileExt = url.split('.').pop()?.split('?')[0].toUpperCase();
+
+              if (isImg) {
+                return (
+                  <button
+                    key={i}
+                    onClick={(e) => { e.stopPropagation(); setPreviewImage(url); }}
+                    className="group relative block w-32 h-32 border border-[var(--border)] rounded-xl overflow-hidden hover:border-[var(--accent)] transition-all shadow-lg bg-[var(--sidebar)] text-left"
+                  >
+                    <img
+                      src={url}
+                      alt="attachment"
+                      className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Plus size={20} className="text-white" />
+                    </div>
+                  </button>
+                );
+              }
+
+              return (
+                <button
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); handleDownload(url); }}
+                  className="group relative flex flex-col items-center justify-center w-32 h-32 border border-[var(--border)] rounded-xl bg-[var(--sidebar)] hover:border-[var(--accent)] hover:bg-[var(--surface-hover)] transition-all shadow-lg p-3 text-center gap-2"
+                >
+                  {getFileIcon(url)}
+                  <span className="text-[10px] font-black uppercase text-[#888] truncate w-full px-1 group-hover:text-[var(--accent)]">
+                    {fileExt}
+                  </span>
+                  <div className="absolute inset-0 bg-[var(--accent)]/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Download size={16} className="text-[var(--accent)]" />
+                  </div>
+                </button>
+              );
+
+            })}
           </div>
         )}
       </div>
     );
   };
+
 
   return (
     <div className="flex h-screen w-full bg-[var(--background)] text-[var(--foreground)] overflow-hidden selection:bg-[var(--accent)]/30 transition-colors duration-300">
@@ -712,7 +772,7 @@ export default function DashboardContent({
                     ) : (
                       <div className="grid grid-cols-1 gap-4">
                         {tasks.map((task) => {
-                          const lastLog = task.logs[0];
+                          const lastLog = task.logs[task.logs.length - 1];
                           const logCount = task.logs.length;
 
                           return (
@@ -1106,17 +1166,27 @@ export default function DashboardContent({
                       <button onClick={() => setTempLogAttachments([])} className="text-[10px] text-[#555] hover:text-[var(--foreground)] transition-colors uppercase font-bold">Limpar tudo</button>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {tempLogAttachments.map((url, i) => (
-                        <div key={i} className="relative group">
-                          <img src={url} className="w-16 h-16 object-cover rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all" />
-                          <button
-                            onClick={() => setTempLogAttachments(prev => prev.filter((_, idx) => idx !== i))}
-                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      ))}
+                      {tempLogAttachments.map((url, i) => {
+                        const isImg = isImage(url);
+                        return (
+                          <div key={i} className="relative group">
+                            {isImg ? (
+                              <img src={url} className="w-16 h-16 object-cover rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all" />
+                            ) : (
+                              <div className="w-16 h-16 bg-[var(--surface)] flex flex-col items-center justify-center rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all text-[var(--accent)]">
+                                {getFileIcon(url)}
+                                <span className="text-[8px] font-black">{url.split('.').pop()?.split('?')[0].toUpperCase()}</span>
+                              </div>
+                            )}
+                            <button
+                              onClick={() => setTempLogAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -1124,10 +1194,10 @@ export default function DashboardContent({
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-[10px] font-bold text-[#666] uppercase tracking-[0.2em]">Novo Andamento</p>
                     <label className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
-                      <Plus size={14} /> Anexar Imagem
+                      <Plus size={14} /> Anexar Arquivo
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,application/pdf,text/xml,text/html,text/csv,text/plain"
                         className="hidden"
                         onChange={(e) => handleFileChange(e, (url) => setTempLogAttachments(prev => [...prev, url]))}
                       />
@@ -1207,10 +1277,10 @@ export default function DashboardContent({
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-sm font-medium text-[#888]">Título da Tarefa</label>
                   <label className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
-                    <Plus size={14} /> Anexar Foto
+                    <Plus size={14} /> Anexar Arquivo
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,application/pdf,text/xml,text/html,text/csv,text/plain"
                       className="hidden"
                       onChange={(e) => handleFileChange(e, (url) => setTempTaskAttachments(prev => [...prev, url]))}
                     />
@@ -1218,12 +1288,22 @@ export default function DashboardContent({
                 </div>
                 {tempTaskAttachments.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {tempTaskAttachments.map((url, i) => (
-                      <div key={i} className="relative group">
-                        <img src={url} className="w-14 h-14 object-cover rounded-xl border border-[#333] hover:border-[var(--accent)] transition-all" />
-                        <button onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
-                      </div>
-                    ))}
+                    {tempTaskAttachments.map((url, i) => {
+                      const isImg = isImage(url);
+                      return (
+                        <div key={i} className="relative group">
+                          {isImg ? (
+                            <img src={url} className="w-14 h-14 object-cover rounded-xl border border-[#333] hover:border-[var(--accent)] transition-all" />
+                          ) : (
+                            <div className="w-14 h-14 bg-[var(--sidebar)] flex flex-col items-center justify-center rounded-xl border border-[#333] hover:border-[var(--accent)] transition-all text-[var(--accent)]">
+                              {getFileIcon(url)}
+                              <span className="text-[8px] font-black">{url.split('.').pop()?.split('?')[0].toUpperCase()}</span>
+                            </div>
+                          )}
+                          <button onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
                 <textarea

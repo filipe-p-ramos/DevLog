@@ -53,3 +53,15 @@ A base de dados será orquestrada via schema prisma:
     - Modo Lista: Compacto, otimizado para alta densidade de informação (estilo Windows Explorer).
     - Modo Card: Visual rico com foco em mídia e logs detalhados.
     - Controles integrados no header com ícones `lucide-react`.
+
+## [2026-04-28] - Automação e Início de Ambiente
+- **Automação:** Criado o script `iniciar.bat` na raiz do projeto para facilitar o arranque do ambiente (verificação de `node_modules` e execução do servidor).
+- **Execução:** Servidor de desenvolvimento Next.js iniciado com sucesso.
+
+## [2026-04-28] - Ajuste de Ordenação por Atividade Recente
+- **Funcionalidade:** Implementada a ordenação dinâmica de tarefas e notas por `updatedAt` (data de atualização).
+- **Lógica de Backend:**
+    - Modificado `getTasks` e `getNotes` para utilizar `orderBy: { updatedAt: "desc" }`.
+    - Atualizadas as actions de `Log` (`createLog`, `updateLog`, `deleteLog`) para forçar a atualização do campo `updatedAt` na tarefa pai via Prisma, garantindo que qualquer interação com andamentos mova a tarefa para o topo da lista.
+
+
