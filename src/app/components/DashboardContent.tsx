@@ -91,6 +91,7 @@ export default function DashboardContent({
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<Task | null>(null);
+  const [isAddingLog, setIsAddingLog] = useState(false);
 
   // Sincroniza a tarefa selecionada com os dados atualizados do servidor
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function DashboardContent({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setSelectedTaskForDetail(null);
+        setIsAddingLog(false);
         setIsProjectModalOpen(false);
         setIsTaskModalOpen(false);
         setIsNoteModalOpen(false);
@@ -242,6 +244,7 @@ export default function DashboardContent({
       setSelectedTag(null);
       setStatusFilter("pending");
       setSelectedTaskForDetail(null);
+      setIsAddingLog(false);
 
       const params = new URLSearchParams(searchParams.toString());
       params.set("project", id);
@@ -489,9 +492,17 @@ export default function DashboardContent({
   return (
     <div className="flex h-screen w-full bg-[var(--background)] text-[var(--foreground)] overflow-hidden selection:bg-[var(--accent)]/30 transition-colors duration-300">
       {/* SIDEBAR - Mobile Responsive */}
+      {/* Backdrop para Mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[65] lg:hidden animate-in fade-in duration-300"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       <aside className={cn(
         "fixed inset-y-0 left-0 z-[70] w-72 bg-[var(--sidebar)] border-r border-[var(--border)] flex flex-col flex-shrink-0 transition-transform duration-300 lg:relative lg:translate-x-0",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        isSidebarOpen ? "translate-x-0" : "-translate-x-full shadow-[0_0_50px_rgba(0,0,0,0.5)]"
       )}>
         <div className="p-6 border-b border-[var(--border)]/50 flex justify-between items-center">
           <div>
@@ -602,8 +613,8 @@ export default function DashboardContent({
       <main className="flex-1 flex flex-col bg-[var(--background)] transition-colors duration-300">
         {selectedProject ? (
           <>
-            <header className="border-b border-[var(--border)] flex flex-col px-4 lg:px-8 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40">
-              <div className="h-16 lg:h-20 flex items-center justify-between">
+            <header className="border-b border-[var(--border)] flex flex-col px-3 lg:px-8 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40">
+              <div className="h-16 lg:h-20 flex items-center justify-between gap-2 overflow-hidden">
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setIsSidebarOpen(true)}
@@ -611,7 +622,7 @@ export default function DashboardContent({
                   >
                     <Menu size={24} />
                   </button>
-                  <h2 className="text-lg lg:text-2xl font-bold text-[var(--foreground)] tracking-tight truncate max-w-[150px] lg:max-w-none">{selectedProject.name}</h2>
+                  <h2 className="text-base lg:text-2xl font-bold text-[var(--foreground)] tracking-tight truncate max-w-[100px] xs:max-w-[150px] sm:max-w-none">{selectedProject.name}</h2>
                   {isPending ? (
                     <div className="flex items-center gap-2 px-3 py-1 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-full animate-pulse">
                       <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce" />
@@ -623,35 +634,35 @@ export default function DashboardContent({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-xl p-1 shadow-sm">
+                <div className="flex items-center gap-1.5 lg:gap-3 flex-shrink-0">
+                  <div className="flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-xl p-0.5 lg:p-1 shadow-sm">
                     <button
                       onClick={() => handleToggleViewMode('card')}
                       className={cn(
-                        "p-1.5 rounded-lg transition-all",
+                        "p-1 lg:p-1.5 rounded-lg transition-all",
                         viewMode === 'card' ? "bg-[var(--accent)] text-[var(--background)] shadow-md" : "text-[#666] hover:text-[var(--foreground)]"
                       )}
                       title="Modo Card"
                     >
-                      <LayoutGrid size={18} />
+                      <LayoutGrid size={16} className="lg:w-[18px] lg:h-[18px]" />
                     </button>
                     <button
                       onClick={() => handleToggleViewMode('list')}
                       className={cn(
-                        "p-1.5 rounded-lg transition-all",
+                        "p-1 lg:p-1.5 rounded-lg transition-all",
                         viewMode === 'list' ? "bg-[var(--accent)] text-[var(--background)] shadow-md" : "text-[#666] hover:text-[var(--foreground)]"
                       )}
                       title="Modo Lista"
                     >
-                      <List size={18} />
+                      <List size={16} className="lg:w-[18px] lg:h-[18px]" />
                     </button>
                   </div>
                   <button
                     onClick={toggleTheme}
-                    className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-all shadow-sm active:scale-95"
+                    className="p-1.5 lg:p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-all shadow-sm active:scale-95"
                     title={theme === 'dark' ? "Mudar para tema claro" : "Mudar para tema escuro"}
                   >
-                    {theme === 'dark' ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-[var(--accent)]" />}
+                    {theme === 'dark' ? <Sun size={18} className="text-amber-400 lg:w-5 lg:h-5" /> : <Moon size={18} className="text-[var(--accent)] lg:w-5 lg:h-5" />}
                   </button>
                 </div>
               </div>
@@ -703,7 +714,7 @@ export default function DashboardContent({
               )}
 
               {/* Status Tabs */}
-              <div className="mt-4 flex items-center justify-start border-b border-[#333]/50 pb-px gap-8">
+              <div className="mt-4 flex items-center justify-start border-b border-[#333]/50 pb-px gap-4 sm:gap-8 overflow-x-auto no-scrollbar">
                 <button
                   onClick={() => setStatusFilter("pending")}
                   className={cn(
@@ -726,7 +737,7 @@ export default function DashboardContent({
                 </button>
 
                 {/* Busca colada às abas com gap-8 */}
-                <div className="relative group mb-2 w-full max-w-xs sm:max-w-md">
+                <div className="relative group mb-2 w-full max-w-[200px] xs:max-w-xs sm:max-w-md ml-auto">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#666] group-focus-within:text-[var(--accent)] transition-colors">
                     <Search size={14} />
                   </div>
@@ -971,7 +982,18 @@ export default function DashboardContent({
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-[var(--background)] p-8">
+          <>
+            {/* Mobile Header para Estado Vazio */}
+            <header className="lg:hidden h-16 border-b border-[var(--border)] flex items-center px-4 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40">
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 text-[#666] hover:text-[var(--foreground)]"
+              >
+                <Menu size={24} />
+              </button>
+              <h1 className="ml-4 text-lg font-bold text-[var(--foreground)] tracking-tight">Project Notes</h1>
+            </header>
+            <div className="flex-1 flex items-center justify-center bg-[var(--background)] p-8">
             <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-500">
               <div className="relative inline-block">
                 <div className="absolute inset-0 bg-[var(--accent)]/20 blur-3xl rounded-full" />
@@ -1012,6 +1034,7 @@ export default function DashboardContent({
               )}
             </div>
           </div>
+          </>
         )}
       </main>
 
@@ -1089,6 +1112,18 @@ export default function DashboardContent({
                     <h3 className="text-sm font-bold text-[#888] uppercase tracking-widest flex items-center gap-2">
                       <MessageSquare size={16} className="text-[var(--accent)]" /> Andamentos ({selectedTaskForDetail.logs.length})
                     </h3>
+                    <button
+                      onClick={() => setIsAddingLog(!isAddingLog)}
+                      className={cn(
+                        "px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-2 active:scale-95 shadow-lg border",
+                        isAddingLog 
+                          ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20" 
+                          : "bg-[var(--accent)] border-[var(--accent)] text-[var(--background)] hover:opacity-90"
+                      )}
+                    >
+                      {isAddingLog ? <X size={14} strokeWidth={3} /> : <Plus size={14} strokeWidth={3} />}
+                      {isAddingLog ? "Cancelar" : "Registrar Andamento"}
+                    </button>
                   </div>
 
                   <div className="space-y-4">
@@ -1104,15 +1139,17 @@ export default function DashboardContent({
                         />
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex items-center gap-3">
-                            <div
-                              className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider"
-                              style={{
-                                backgroundColor: log.type === "blocker" ? "#ef444420" : `${selectedProject?.color}20`,
-                                color: log.type === "blocker" ? "#ef4444" : selectedProject?.color
-                              }}
-                            >
-                              {log.type === "blocker" ? "Bloqueio ⚠️" : "Andamento ✅"}
-                            </div>
+                            {log.type === "blocker" && (
+                              <div
+                                className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider"
+                                style={{
+                                  backgroundColor: "#ef444420",
+                                  color: "#ef4444"
+                                }}
+                              >
+                                Bloqueio ⚠️
+                              </div>
+                            )}
                             <span className="text-[10px] font-bold text-[#888]">{new Date(log.createdAt).toLocaleString()}</span>
                           </div>
 
@@ -1156,83 +1193,96 @@ export default function DashboardContent({
                 </section>
               </div>
             </div>
-            <footer className="p-6 bg-[var(--sidebar)] border-t border-[var(--border)]">
-              <div className="max-w-3xl mx-auto space-y-4">
-                {/* Preview de Imagens em Tempo Real */}
-                {tempLogAttachments.length > 0 && (
-                  <div id="log-preview">
+            {isAddingLog && (
+              <footer className="p-6 bg-[var(--sidebar)] border-t border-[var(--border)] animate-in slide-in-from-bottom duration-300">
+                <div className="max-w-3xl mx-auto space-y-4">
+                  {/* Preview de Imagens em Tempo Real */}
+                  {tempLogAttachments.length > 0 && (
+                    <div id="log-preview">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest text-glow">Anexos ({tempLogAttachments.length})</p>
+                        <button onClick={() => setTempLogAttachments([])} className="text-[10px] text-[#555] hover:text-[var(--foreground)] transition-colors uppercase font-bold">Limpar tudo</button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {tempLogAttachments.map((url, i) => {
+                          const isImg = isImage(url);
+                          return (
+                            <div key={i} className="relative group">
+                              {isImg ? (
+                                <img src={url} className="w-16 h-16 object-cover rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all" />
+                              ) : (
+                                <div className="w-16 h-16 bg-[var(--surface)] flex flex-col items-center justify-center rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all text-[var(--accent)]">
+                                  {getFileIcon(url)}
+                                  <span className="text-[8px] font-black">{url.split('.').pop()?.split('?')[0].toUpperCase()}</span>
+                                </div>
+                              )}
+                              <button
+                                onClick={() => setTempLogAttachments(prev => prev.filter((_, idx) => idx !== i))}
+                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              >
+                                <X size={10} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest text-glow">Anexos ({tempLogAttachments.length})</p>
-                      <button onClick={() => setTempLogAttachments([])} className="text-[10px] text-[#555] hover:text-[var(--foreground)] transition-colors uppercase font-bold">Limpar tudo</button>
+                      <p className="text-[10px] font-bold text-[#666] uppercase tracking-[0.2em]">Novo Andamento</p>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
+                          <Plus size={14} /> Anexar Arquivo
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf,text/xml,text/html,text/csv,text/plain"
+                            className="hidden"
+                            onChange={(e) => handleFileChange(e, (url) => setTempLogAttachments(prev => [...prev, url]))}
+                          />
+                        </label>
+                        <button 
+                          onClick={() => setIsAddingLog(false)}
+                          className="p-1.5 text-[#555] hover:text-[var(--foreground)] transition-colors"
+                          title="Fechar"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {tempLogAttachments.map((url, i) => {
-                        const isImg = isImage(url);
-                        return (
-                          <div key={i} className="relative group">
-                            {isImg ? (
-                              <img src={url} className="w-16 h-16 object-cover rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all" />
-                            ) : (
-                              <div className="w-16 h-16 bg-[var(--surface)] flex flex-col items-center justify-center rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all text-[var(--accent)]">
-                                {getFileIcon(url)}
-                                <span className="text-[8px] font-black">{url.split('.').pop()?.split('?')[0].toUpperCase()}</span>
-                              </div>
-                            )}
-                            <button
-                              onClick={() => setTempLogAttachments(prev => prev.filter((_, idx) => idx !== i))}
-                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              <X size={10} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                    <div className="relative group">
+                      <textarea
+                        autoFocus
+                        placeholder="Descreva o andamento... Cole prints (Ctrl+V) 📋"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            const content = e.currentTarget.value;
+                            const target = e.currentTarget;
+                            if (!content && tempLogAttachments.length === 0) return;
 
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[10px] font-bold text-[#666] uppercase tracking-[0.2em]">Novo Andamento</p>
-                    <label className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
-                      <Plus size={14} /> Anexar Arquivo
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf,text/xml,text/html,text/csv,text/plain"
-                        className="hidden"
-                        onChange={(e) => handleFileChange(e, (url) => setTempLogAttachments(prev => [...prev, url]))}
-                      />
-                    </label>
-                  </div>
-                  <div className="relative group">
-                    <textarea
-                      placeholder="Descreva o andamento... Cole prints (Ctrl+V) 📋"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          const content = e.currentTarget.value;
-                          const target = e.currentTarget;
-                          if (!content && tempLogAttachments.length === 0) return;
-
-                          startTransition(async () => {
-                            await createLog(selectedTaskForDetail.id, content, "note", tempLogAttachments);
-                            target.value = "";
-                            setTempLogAttachments([]);
+                            startTransition(async () => {
+                              await createLog(selectedTaskForDetail.id, content, "note", tempLogAttachments);
+                              target.value = "";
+                              setTempLogAttachments([]);
+                              setIsAddingLog(false);
+                            });
+                          }
+                        }}
+                        onPaste={(e) => {
+                          handlePaste(e, (url) => {
+                            setTempLogAttachments(prev => [...prev, url]);
                           });
-                        }
-                      }}
-                      onPaste={(e) => {
-                        handlePaste(e, (url) => {
-                          setTempLogAttachments(prev => [...prev, url]);
-                        });
-                      }}
-                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-5 py-4 text-[15px] text-[var(--foreground)] placeholder-[#444] focus:outline-none focus:border-[var(--accent)] transition-all resize-none min-h-[120px]"
-                    />
-                    <div className="absolute bottom-4 right-4 text-[10px] font-bold text-[#444] uppercase pointer-events-none group-hover:text-[#666] transition-all">
-                      Pressione ENTER para registrar o andamento
+                        }}
+                        className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-5 py-4 text-[15px] text-[var(--foreground)] placeholder-[#444] focus:outline-none focus:border-[var(--accent)] transition-all resize-none min-h-[120px]"
+                      />
+                      <div className="absolute bottom-4 right-4 text-[10px] font-bold text-[#444] uppercase pointer-events-none group-hover:text-[#666] transition-all">
+                        Pressione ENTER para registrar o andamento
+                      </div>
                     </div>
-                  </div>
-              </div>
-            </footer>
+                </div>
+              </footer>
+            )}
           </div>
         </div>
       )}
