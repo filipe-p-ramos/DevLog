@@ -9,6 +9,10 @@ if not exist node_modules (
     echo [!] node_modules nao encontrado. Instalando...
     npm install
 )
+
+echo [!] Gerando Prisma Client...
+call npx prisma generate
+
 echo.
 echo [!] Iniciando Next.js...
 npm run dev
