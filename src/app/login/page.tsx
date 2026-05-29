@@ -16,8 +16,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#111111] p-4 font-sans text-[#ededed]">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-[#1a1a1a] border border-[#333333] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-            <LockKeyhole className="w-8 h-8 text-blue-500" />
+          <div className="w-16 h-16 bg-[#1a1a1a] border border-[#333333] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl overflow-hidden">
+            <img 
+              src="/logo-devlog.png" 
+              alt="Logo DevLog" 
+              className="w-full h-full object-cover"
+            />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Project Notes</h1>
           <p className="text-[#888888]">Acesso restrito. Insira a senha do sistema.</p>

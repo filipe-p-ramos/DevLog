@@ -26,7 +26,9 @@ export const config = {
      * - _next/static (arquivos estáticos e CSS)
      * - _next/image (arquivos de imagem otimizados)
      * - favicon.ico (ícone)
+     * - logo-devlog.png (logotipo público)
+     * - icon.png (favicon dinâmico do Next.js)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|logo-devlog.png|icon.png).*)',
   ],
 };

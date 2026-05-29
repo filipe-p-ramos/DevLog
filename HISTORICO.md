@@ -64,4 +64,18 @@ A base de dados será orquestrada via schema prisma:
     - Modificado `getTasks` e `getNotes` para utilizar `orderBy: { updatedAt: "desc" }`.
     - Atualizadas as actions de `Log` (`createLog`, `updateLog`, `deleteLog`) para forçar a atualização do campo `updatedAt` na tarefa pai via Prisma, garantindo que qualquer interação com andamentos mova a tarefa para o topo da lista.
 
+## [2026-05-29] - Nova Identidade Visual e Favicon Dinâmico (DevLog)
+- **Status:** Concluído (Incremento Estável).
+- **Ações:**
+    - **Criação de Logo Proprietário (Tech/Dev Theme):** Gerado um logotipo sob medida focado em desenvolvimento e rastreamento de tarefas (símbolos de chaves de código e checklist minimalista) em tons de azul escuro, ciano e cinza grafite.
+    - **Estruturação de Pastas & Assets:**
+        - Criado o diretório estático `public/` (inexistente no boilerplate inicial) para hospedar `logo-devlog.png` ($1024 \times 1024$px com zoom máximo e apenas 5% de margem útil para máxima visibilidade e legibilidade).
+        - Copiado o asset para `src/app/icon.png` habilitando o roteador de favicons automáticos do Next.js App Router.
+    - **Integração Visual Estrita:**
+        - **Sidebar Header** (`DashboardContent.tsx`): Integrada a imagem do novo logotipo em um container arredondado de bordas finas com transição suave de escala em `hover` ao lado do título principal "Project Notes".
+        - **Tela de Login** (`login/page.tsx`): Substituído o ícone de cadeado genérico (`LockKeyhole`) pelo logotipo oficial centralizado na tela de acesso, trazendo consistência visual desde o primeiro instante de acesso.
+    - **Documentação de Arquitetura:** Criado o plano detalhado e manual de identidade em `doc/icone-identidade-visual.md`.
+- **Benefício:** Padronização estética profissional e eliminação de designs secos sem ícones, proporcionando a experiência premium exigida pelo padrão visual moderno.
+
+
 

@@ -512,10 +512,19 @@ export default function DashboardContent({
               params.delete("project");
               router.push(`/?${params.toString()}`);
             }}
-            className="text-left hover:opacity-80 transition-opacity"
+            className="text-left hover:opacity-80 transition-opacity flex items-center gap-3 group"
           >
-            <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">Project Notes</h1>
-            <p className="text-sm text-[#888888] mt-1 font-medium">seus projetos em foco</p>
+            <div className="relative w-10 h-10 overflow-hidden rounded-xl border border-[var(--border)] transition-transform duration-300 group-hover:scale-105 flex-shrink-0">
+              <img 
+                src="/logo-devlog.png" 
+                alt="Logo DevLog" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">Project Notes</h1>
+              <p className="text-sm text-[#888888] mt-0.5 font-medium">seus projetos em foco</p>
+            </div>
           </button>
           </div>
           <div className="flex items-center gap-2">
