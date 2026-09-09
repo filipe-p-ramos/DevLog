@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useTransition, useEffect } from "react";
+import React, { useState, useTransition, useEffect, useMemo } from "react";
 import {
   CheckCircle2, Circle, Filter, Plus, LogOut,
-  Trash2, Edit2, X, Save, AlertCircle, MessageSquare,
-  ChevronUp, ChevronDown, ChevronRight, Menu, Sun, Moon, Search, List, LayoutGrid,
-  FileText, FileCode, File, Download
+  Trash2, Edit2, X, MessageSquare,
+  ChevronUp, ChevronDown, Menu, Sun, Moon, Search, List, LayoutGrid,
+  FileText, FileCode, File, Download, Send, MoreVertical
 } from "lucide-react";
 
 import { logout } from "../actions/auth";
@@ -18,7 +18,7 @@ import { updateTagColor } from "../actions/tags";
 import { createNote, updateNote, deleteNote } from "../actions/notes";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { supabase, uploadAttachment } from "@/lib/supabase";
+import { uploadAttachment } from "@/lib/supabase";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -78,7 +78,7 @@ export default function DashboardContent({
 }: {
   initialProjects: Project[],
   initialTasks: Task[],
-  initialNotes: any[],
+  initialNotes: Note[],
   tagConfigs: { name: string, color: string }[],
   currentProjectId?: string
 }) {
@@ -86,39 +86,13 @@ export default function DashboardContent({
   const searchParams = useSearchParams();
   const selectedProjectId = currentProjectId;
 
+  // Estados principais
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<Task | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isAddingLog, setIsAddingLog] = useState(false);
-
-  // Sincroniza a tarefa selecionada com os dados atualizados do servidor
-  useEffect(() => {
-    if (selectedTaskForDetail) {
-      const updated = initialTasks.find(t => t.id === selectedTaskForDetail.id);
-      if (updated) setSelectedTaskForDetail(updated);
-    }
-  }, [initialTasks]);
-
-  // Fechar janelas com ESC
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setSelectedTaskForDetail(null);
-        setIsAddingLog(false);
-        setIsProjectModalOpen(false);
-        setIsTaskModalOpen(false);
-        setIsNoteModalOpen(false);
-        setEditingProject(null);
-        setEditingTask(null);
-        setEditingNoteId(null);
-        setPreviewImage(null);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
 
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<"pending" | "completed">("pending");
@@ -132,7 +106,10 @@ export default function DashboardContent({
   const [newTaskTags, setNewTaskTags] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'tasks' | 'notes'>('tasks');
+  const [mobileProjectMenuId, setMobileProjectMenuId] = useState<string | null>(null);
 
+  const [newLogContent, setNewLogContent] = useState("");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editingLogContent, setEditingLogContent] = useState("");
 
@@ -153,17 +130,46 @@ export default function DashboardContent({
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [isPending, startTransition] = useTransition();
 
+  // Derivado reativo da tarefa selecionada (evita cascading renders de useEffect)
+  const selectedTaskForDetail = useMemo(() => {
+    if (!selectedTaskId) return null;
+    return initialTasks.find(t => t.id === selectedTaskId) || null;
+  }, [selectedTaskId, initialTasks]);
+
+  // Fechar janelas com ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedTaskId(null);
+        setIsAddingLog(false);
+        setIsProjectModalOpen(false);
+        setIsTaskModalOpen(false);
+        setIsNoteModalOpen(false);
+        setEditingProject(null);
+        setEditingTask(null);
+        setEditingNoteId(null);
+        setPreviewImage(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Persistência de Tema e Visualização
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.classList.toggle('theme-light', savedTheme === 'light');
-    }
+    const savedTheme = localStorage.getItem('theme') as 'dark' | 'light' | null;
+    const savedViewMode = localStorage.getItem('viewMode') as 'card' | 'list' | null;
 
-    const savedViewMode = localStorage.getItem('viewMode') as 'card' | 'list';
-    if (savedViewMode) {
-      setViewMode(savedViewMode);
+    if (savedTheme || savedViewMode) {
+      startTransition(() => {
+        if (savedTheme) {
+          setTheme(savedTheme);
+          document.documentElement.classList.toggle('theme-light', savedTheme === 'light');
+        }
+        if (savedViewMode) {
+          setViewMode(savedViewMode);
+        }
+      });
     }
   }, []);
 
@@ -243,7 +249,7 @@ export default function DashboardContent({
       // Resetar filtros ao trocar de projeto
       setSelectedTag(null);
       setStatusFilter("pending");
-      setSelectedTaskForDetail(null);
+      setSelectedTaskId(null);
       setIsAddingLog(false);
 
       const params = new URLSearchParams(searchParams.toString());
@@ -324,6 +330,17 @@ export default function DashboardContent({
         setTempLogAttachments([]);
       });
     }
+  };
+
+  const handleCreateLog = () => {
+    if (!newLogContent.trim() && tempLogAttachments.length === 0) return;
+    if (!selectedTaskForDetail) return;
+    startTransition(async () => {
+      await createLog(selectedTaskForDetail.id, newLogContent, "note", tempLogAttachments);
+      setNewLogContent("");
+      setTempLogAttachments([]);
+      setIsAddingLog(false);
+    });
   };
 
   const handleToggleTask = (task: Task) => {
@@ -490,7 +507,7 @@ export default function DashboardContent({
 
 
   return (
-    <div className="flex h-screen w-full bg-[var(--background)] text-[var(--foreground)] overflow-hidden selection:bg-[var(--accent)]/30 transition-colors duration-300">
+    <div className="flex h-[100dvh] w-full bg-[var(--background)] text-[var(--foreground)] overflow-hidden selection:bg-[var(--accent)]/30 transition-colors duration-300">
       {/* SIDEBAR - Mobile Responsive */}
       {/* Backdrop para Mobile */}
       {isSidebarOpen && (
@@ -501,10 +518,10 @@ export default function DashboardContent({
       )}
 
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-[70] w-72 bg-[var(--sidebar)] border-r border-[var(--border)] flex flex-col flex-shrink-0 transition-transform duration-300 lg:relative lg:translate-x-0",
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+        "fixed inset-y-0 left-0 z-[70] w-72 sm:w-80 bg-[var(--sidebar)] border-r border-[var(--border)] flex flex-col flex-shrink-0 transition-transform duration-300 lg:relative lg:translate-x-0",
+        isSidebarOpen ? "translate-x-0 shadow-[0_0_50px_rgba(0,0,0,0.5)]" : "-translate-x-full"
       )}>
-        <div className="p-6 border-b border-[var(--border)]/50 flex justify-between items-center">
+        <div className="p-5 sm:p-6 border-b border-[var(--border)]/50 flex justify-between items-center">
           <div>
           <button 
             onClick={() => {
@@ -522,12 +539,12 @@ export default function DashboardContent({
               />
             </div>
             <div>
-              <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">Project Notes</h1>
-              <p className="text-sm text-[#888888] mt-0.5 font-medium">seus projetos em foco</p>
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)]">Project Notes</h1>
+              <p className="text-xs sm:text-sm text-[#888888] mt-0.5 font-medium">seus projetos em foco</p>
             </div>
           </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={() => setIsSidebarOpen(false)}
               className="lg:hidden p-2 text-[#666] hover:text-[var(--foreground)]"
@@ -550,41 +567,63 @@ export default function DashboardContent({
             <h2 className="text-xs font-bold text-[#666666] uppercase tracking-wider mb-3 px-2">Projetos</h2>
             <nav className="space-y-1">
               {initialProjects.map((project) => (
-                <div key={project.id} className="group relative">
+                <div
+                  key={project.id}
+                  className={cn(
+                    "group relative flex items-center justify-between rounded-xl transition-all mb-1 overflow-hidden",
+                    selectedProjectId === project.id
+                      ? "bg-[var(--surface-hover)] text-[var(--foreground)] shadow-lg"
+                      : "text-[#888] hover:bg-[var(--surface-hover)]/40 hover:text-[var(--foreground)]"
+                  )}
+                  style={selectedProjectId === project.id ? { borderLeft: `2px solid ${project.color}` } : {}}
+                >
                   <button
+                    type="button"
                     onClick={() => { handleSelectProject(project.id); setIsSidebarOpen(false); }}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all text-left mb-1",
-                      selectedProjectId === project.id
-                        ? "bg-[var(--surface-hover)] text-[var(--foreground)] shadow-lg"
-                        : "text-[#888] hover:bg-[var(--surface-hover)]/40 hover:text-[var(--foreground)]"
-                    )}
-                    style={selectedProjectId === project.id ? { borderLeft: `2px solid ${project.color}` } : {}}
+                    className="flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
                   >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div
-                        className="w-2 h-2 rounded-full flex-shrink-0 transition-all duration-500"
-                        style={{
-                          backgroundColor: project.color,
-                          boxShadow: selectedProjectId === project.id ? `0 0 12px ${project.color}` : `0 0 4px ${project.color}40`
-                        }}
-                      />
-                      <span className="font-bold text-sm truncate tracking-tight">{project.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        "text-[10px] font-black px-2 py-0.5 rounded-lg transition-colors",
-                        selectedProjectId === project.id ? "bg-white/10 text-[var(--foreground)]" : "bg-black/20 text-[#555]"
-                      )}>
-                        {project._count?.tasks || 0}
-                      </span>
-                    </div>
+                    <div
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all duration-500"
+                      style={{
+                        backgroundColor: project.color,
+                        boxShadow: selectedProjectId === project.id ? `0 0 12px ${project.color}` : `0 0 4px ${project.color}40`
+                      }}
+                    />
+                    <span className="font-bold text-sm truncate tracking-tight">{project.name}</span>
                   </button>
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-1 bg-[var(--surface)] p-1 rounded-lg shadow-xl border border-[var(--border)]">
+
+                  <div className="flex items-center gap-1.5 pr-2.5 flex-shrink-0">
+                    <span className={cn(
+                      "text-[10px] font-black px-2 py-0.5 rounded-lg transition-colors",
+                      selectedProjectId === project.id ? "bg-white/10 text-[var(--foreground)]" : "bg-black/20 text-[#555]"
+                    )}>
+                      {project._count?.tasks || 0}
+                    </span>
+                    {/* Botão de menu mobile */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMobileProjectMenuId(mobileProjectMenuId === project.id ? null : project.id);
+                      }}
+                      className="lg:hidden p-1.5 text-[#666] hover:text-[var(--foreground)] rounded-lg hover:bg-white/5 transition-colors"
+                      title="Opções do projeto"
+                    >
+                      <MoreVertical size={14} />
+                    </button>
+                  </div>
+
+                  <div className={cn(
+                    "items-center gap-1 bg-[var(--surface)] p-1 rounded-lg shadow-xl border border-[var(--border)] z-10",
+                    mobileProjectMenuId === project.id
+                      ? "flex absolute right-2 top-1/2 -translate-y-1/2"
+                      : "hidden lg:group-hover:flex absolute right-2 top-1/2 -translate-y-1/2"
+                  )}>
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'up'); }} 
                       disabled={initialProjects.indexOf(project) === 0}
                       className="p-1 hover:text-[var(--accent)] disabled:opacity-20"
+                      title="Mover para cima"
                     >
                       <ChevronUp size={14} />
                     </button>
@@ -592,12 +631,13 @@ export default function DashboardContent({
                       onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'down'); }} 
                       disabled={initialProjects.indexOf(project) === initialProjects.length - 1}
                       className="p-1 hover:text-[var(--accent)] disabled:opacity-20"
+                      title="Mover para baixo"
                     >
                       <ChevronDown size={14} />
                     </button>
                     <div className="w-px h-3 bg-[var(--border)] mx-1" />
-                    <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); setNewProjectName(project.name); }} className="p-1 hover:text-blue-400"><Edit2 size={12} /></button>
-                    <button onClick={(e) => handleDeleteProject(project.id, e)} className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
+                    <button onClick={(e) => { e.stopPropagation(); setEditingProject(project); setNewProjectName(project.name); setMobileProjectMenuId(null); }} className="p-1 hover:text-blue-400" title="Editar"><Edit2 size={12} /></button>
+                    <button onClick={(e) => { setMobileProjectMenuId(null); handleDeleteProject(project.id, e); }} className="p-1 hover:text-red-400" title="Excluir"><Trash2 size={12} /></button>
                   </div>
                 </div>
               ))}
@@ -619,78 +659,87 @@ export default function DashboardContent({
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 flex flex-col bg-[var(--background)] transition-colors duration-300">
+      <main className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden bg-[var(--background)] transition-colors duration-300">
         {selectedProject ? (
           <>
-            <header className="border-b border-[var(--border)] flex flex-col px-3 lg:px-8 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40">
-              <div className="h-16 lg:h-20 flex items-center justify-between gap-2 overflow-hidden">
-                <div className="flex items-center gap-4">
+            <header className="border-b border-[var(--border)] flex flex-col px-3 sm:px-4 lg:px-8 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40 w-full min-w-0 max-w-full">
+              <div className="h-14 sm:h-16 lg:h-20 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                   <button
                     onClick={() => setIsSidebarOpen(true)}
-                    className="lg:hidden p-2 text-[#666] hover:text-[var(--foreground)]"
+                    className="lg:hidden p-2 -ml-1 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-xl transition-all"
+                    aria-label="Abrir menu de projetos"
                   >
-                    <Menu size={24} />
+                    <Menu size={22} />
                   </button>
-                  <h2 className="text-base lg:text-2xl font-bold text-[var(--foreground)] tracking-tight truncate max-w-[100px] xs:max-w-[150px] sm:max-w-none">{selectedProject.name}</h2>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div 
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: selectedProject.color }}
+                    />
+                    <h2 className="text-base sm:text-lg lg:text-2xl font-bold text-[var(--foreground)] tracking-tight truncate max-w-[130px] xs:max-w-[190px] sm:max-w-none">
+                      {selectedProject.name}
+                    </h2>
+                  </div>
                   {isPending ? (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-full animate-pulse">
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 sm:px-3 sm:py-1 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-full animate-pulse flex-shrink-0">
                       <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce" />
-                      <span className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest">Carregando</span>
+                      <span className="text-[9px] sm:text-[10px] font-bold text-[var(--accent)] uppercase tracking-wider">Salvando</span>
                     </div>
                   ) : (
-                    <span className="hidden sm:inline-block px-3 py-1 bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[var(--accent)] text-xs font-bold rounded-full">
+                    <span className="hidden sm:inline-block px-2.5 py-0.5 bg-[var(--accent)]/10 border border-[var(--accent)]/20 text-[var(--accent)] text-xs font-bold rounded-full flex-shrink-0">
                       {selectedProject.status === 'active' ? 'ativo' : 'arquivado'}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 lg:gap-3 flex-shrink-0">
-                  <div className="flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-xl p-0.5 lg:p-1 shadow-sm">
+                <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0">
+                  <div className="flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-xl p-0.5 sm:p-1 shadow-sm">
                     <button
                       onClick={() => handleToggleViewMode('card')}
                       className={cn(
-                        "p-1 lg:p-1.5 rounded-lg transition-all",
+                        "p-1.5 rounded-lg transition-all",
                         viewMode === 'card' ? "bg-[var(--accent)] text-[var(--background)] shadow-md" : "text-[#666] hover:text-[var(--foreground)]"
                       )}
                       title="Modo Card"
                     >
-                      <LayoutGrid size={16} className="lg:w-[18px] lg:h-[18px]" />
+                      <LayoutGrid size={16} />
                     </button>
                     <button
                       onClick={() => handleToggleViewMode('list')}
                       className={cn(
-                        "p-1 lg:p-1.5 rounded-lg transition-all",
+                        "p-1.5 rounded-lg transition-all",
                         viewMode === 'list' ? "bg-[var(--accent)] text-[var(--background)] shadow-md" : "text-[#666] hover:text-[var(--foreground)]"
                       )}
                       title="Modo Lista"
                     >
-                      <List size={16} className="lg:w-[18px] lg:h-[18px]" />
+                      <List size={16} />
                     </button>
                   </div>
                   <button
                     onClick={toggleTheme}
-                    className="p-1.5 lg:p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-all shadow-sm active:scale-95"
+                    className="p-2 sm:p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-all shadow-sm active:scale-95"
                     title={theme === 'dark' ? "Mudar para tema claro" : "Mudar para tema escuro"}
                   >
-                    {theme === 'dark' ? <Sun size={18} className="text-amber-400 lg:w-5 lg:h-5" /> : <Moon size={18} className="text-[var(--accent)] lg:w-5 lg:h-5" />}
+                    {theme === 'dark' ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-[var(--accent)]" />}
                   </button>
                 </div>
               </div>
 
               {/* Tag Filter Bar */}
               {allUniqueTags.length > 0 && (
-                <div className="pb-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
-                  <Filter size={14} className="text-[#666] mr-1" />
+                <div className="pb-3 flex items-center gap-2 overflow-x-auto no-scrollbar touch-pan-x w-full min-w-0 max-w-full">
+                  <Filter size={14} className="text-[#666] mr-1 flex-shrink-0" />
                   <button
                     onClick={() => setSelectedTag(null)}
                     className={cn(
-                      "px-3 py-1 rounded-full text-xs font-bold transition-all border",
+                      "px-3 py-1 rounded-full text-xs font-bold transition-all border flex-shrink-0",
                       !selectedTag ? "bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)]" : "bg-[var(--surface)] border-[var(--border)] text-[#666] hover:border-[#444]"
                     )}
                   >Todas</button>
                   {allUniqueTags.map(tag => {
                     const tagColor = getTagColor(tag);
                     return (
-                      <div key={tag} className="relative group">
+                      <div key={tag} className="relative group flex-shrink-0">
                         <button
                           onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
                           className={cn(
@@ -705,12 +754,12 @@ export default function DashboardContent({
                           } : {}}
                         >{tag}</button>
 
-                        {/* Seletor de cores escondido, aparece no hover do filtro */}
+                        {/* Seletor de cores escondido */}
                         <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <input
                             type="color"
                             className="w-4 h-4 rounded-full border border-white/20 bg-transparent cursor-pointer overflow-hidden p-0"
-                            value={tagColor.startsWith('hsl') ? '#3b82f6' : tagColor} // Fallback para hex se for hsl
+                            value={tagColor.startsWith('hsl') ? '#3b82f6' : tagColor}
                             onChange={(e) => handleTagColorChange(tag, e.target.value)}
                             onBlur={(e) => saveTagColorChange(tag, e.target.value)}
                             title="Mudar cor da tag"
@@ -722,31 +771,45 @@ export default function DashboardContent({
                 </div>
               )}
 
-              {/* Status Tabs */}
-              <div className="mt-4 flex items-center justify-start border-b border-[#333]/50 pb-px gap-4 sm:gap-8 overflow-x-auto no-scrollbar">
-                <button
-                  onClick={() => setStatusFilter("pending")}
-                  className={cn(
-                    "pb-3 text-sm font-bold transition-all relative",
-                    statusFilter === "pending" ? "text-[var(--accent)]" : "text-[#555] hover:text-[#888]"
-                  )}
-                >
-                  Pendentes
-                  {statusFilter === "pending" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]" />}
-                </button>
-                <button
-                  onClick={() => setStatusFilter("completed")}
-                  className={cn(
-                    "pb-3 text-sm font-bold transition-all relative",
-                    statusFilter === "completed" ? "text-emerald-400" : "text-[#555] hover:text-[#888]"
-                  )}
-                >
-                  Concluídas
-                  {statusFilter === "completed" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
-                </button>
+              {/* Status Tabs and Search */}
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 border-t border-[var(--border)]/40 w-full min-w-0">
+                <div className="flex items-center gap-6 flex-shrink-0">
+                  <button
+                    onClick={() => setStatusFilter("pending")}
+                    className={cn(
+                      "pb-1 text-sm font-bold transition-all relative flex items-center gap-1.5",
+                      statusFilter === "pending" ? "text-[var(--accent)]" : "text-[#666] hover:text-[#888]"
+                    )}
+                  >
+                    <span>Pendentes</span>
+                    <span className={cn(
+                      "text-[10px] font-black px-1.5 py-0.5 rounded-md",
+                      statusFilter === "pending" ? "bg-[var(--accent)]/15 text-[var(--accent)]" : "bg-[var(--surface)] text-[#666]"
+                    )}>
+                      {initialTasks.filter(t => t.status !== "completed").length}
+                    </span>
+                    {statusFilter === "pending" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]" />}
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter("completed")}
+                    className={cn(
+                      "pb-1 text-sm font-bold transition-all relative flex items-center gap-1.5",
+                      statusFilter === "completed" ? "text-emerald-400" : "text-[#666] hover:text-[#888]"
+                    )}
+                  >
+                    <span>Concluídas</span>
+                    <span className={cn(
+                      "text-[10px] font-black px-1.5 py-0.5 rounded-md",
+                      statusFilter === "completed" ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface)] text-[#666]"
+                    )}>
+                      {initialTasks.filter(t => t.status === "completed").length}
+                    </span>
+                    {statusFilter === "completed" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
+                  </button>
+                </div>
 
-                {/* Busca colada às abas com gap-8 */}
-                <div className="relative group mb-2 w-full max-w-[200px] xs:max-w-xs sm:max-w-md ml-auto">
+                {/* Busca */}
+                <div className="relative group w-full sm:w-64 lg:w-80 min-w-0">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#666] group-focus-within:text-[var(--accent)] transition-colors">
                     <Search size={14} />
                   </div>
@@ -755,30 +818,75 @@ export default function DashboardContent({
                     placeholder="Buscar tarefas..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-8 py-1.5 bg-[var(--sidebar)] border border-[var(--border)] rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all shadow-inner"
+                    className="w-full pl-9 pr-8 py-2 bg-[var(--sidebar)] border border-[var(--border)] rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all shadow-inner"
                   />
                   {searchQuery && (
                     <button 
                       onClick={() => setSearchQuery("")}
-                      className="absolute inset-y-0 right-0 pr-2 flex items-center text-[#666] hover:text-[var(--foreground)]"
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[#666] hover:text-[var(--foreground)]"
                     >
-                      <X size={12} />
+                      <X size={13} />
                     </button>
                   )}
                 </div>
               </div>
             </header>
 
-            <div className="flex-1 min-h-0 overflow-hidden p-4 lg:p-8 bg-[var(--background)]">
-              <div className="max-w-[1700px] mx-auto grid grid-cols-1 xl:grid-cols-2 gap-10 h-full">
+            {/* MOBILE VIEW SWITCHER (Visible only on screens < xl) */}
+            <div className="xl:hidden px-3 sm:px-4 pt-3 pb-1 bg-[var(--background)] w-full min-w-0">
+              <div className="flex items-center gap-1.5 p-1 bg-[var(--sidebar)] border border-[var(--border)] rounded-xl w-full">
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('tasks')}
+                  className={cn(
+                    "flex-1 min-w-0 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2",
+                    mobileTab === 'tasks' 
+                      ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm border border-[var(--border)] font-black" 
+                      : "text-[#777] hover:text-[var(--foreground)]"
+                  )}
+                >
+                  <span className="truncate">Tarefas</span>
+                  <span className={cn(
+                    "text-[10px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0",
+                    mobileTab === 'tasks' ? "bg-[var(--accent)]/20 text-[var(--accent)]" : "bg-black/20 text-[#666]"
+                  )}>
+                    {tasks.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMobileTab('notes')}
+                  className={cn(
+                    "flex-1 min-w-0 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2",
+                    mobileTab === 'notes' 
+                      ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm border border-[var(--border)] font-black" 
+                      : "text-[#777] hover:text-[var(--foreground)]"
+                  )}
+                >
+                  <span className="truncate">Notas</span>
+                  <span className={cn(
+                    "text-[10px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0",
+                    mobileTab === 'notes' ? "bg-amber-400/20 text-amber-400" : "bg-black/20 text-[#666]"
+                  )}>
+                    {initialNotes.length}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-8 bg-[var(--background)] w-full min-w-0">
+              <div className="max-w-[1700px] w-full min-w-0 mx-auto grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-10 h-full">
                 {/* COLUNA ESQUERDA: TAREFAS */}
-                <div className="flex flex-col h-full min-h-0">
-                  <div className="flex-1 overflow-y-auto no-scrollbar pr-2 space-y-6 pb-20">
-                    <div className="flex items-center justify-between mb-4 bg-[var(--sidebar)] p-4 rounded-2xl border border-[var(--border)]">
-                      <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[var(--accent)]">Fluxo de Tarefas</h3>
+                <div className={cn(
+                  "flex-col h-full min-h-0 w-full min-w-0",
+                  mobileTab === 'tasks' ? "flex" : "hidden xl:flex"
+                )}>
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar pr-1 sm:pr-2 space-y-4 sm:space-y-6 pb-20 w-full min-w-0">
+                    <div className="flex items-center justify-between mb-2 sm:mb-4 bg-[var(--sidebar)] p-3 sm:p-4 rounded-2xl border border-[var(--border)] w-full min-w-0 gap-2">
+                      <h3 className="text-xs font-black uppercase tracking-[0.15em] sm:tracking-[0.3em] text-[var(--accent)] truncate">Fluxo de Tarefas</h3>
                       <button
                         onClick={() => { setEditingTask(null); setNewTaskTitle(""); setNewTaskDescription(""); setNewTaskTags(""); setIsTaskModalOpen(true); }}
-                        className="px-4 py-2 text-[var(--background)] text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-2 active:scale-95 shadow-lg"
+                        className="px-3 py-2 sm:px-4 sm:py-2 text-[var(--background)] text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 shadow-lg flex-shrink-0"
                         style={{
                           backgroundColor: theme === 'light' ? 'var(--accent)' : selectedProject.color,
                           boxShadow: `0 4px 12px ${theme === 'light' ? 'var(--accent)' : selectedProject.color}30`
@@ -790,7 +898,7 @@ export default function DashboardContent({
                     {tasks.length === 0 ? (
                       <div className="text-center py-20 opacity-40 text-sm font-medium">Nenhuma tarefa encontrada neste filtro.</div>
                     ) : (
-                      <div className="grid grid-cols-1 gap-4">
+                      <div className="grid grid-cols-1 gap-3 sm:gap-4 w-full min-w-0">
                         {tasks.map((task) => {
                           const lastLog = task.logs[task.logs.length - 1];
                           const logCount = task.logs.length;
@@ -798,11 +906,11 @@ export default function DashboardContent({
                           return (
                             <div
                               key={task.id}
-                              onClick={() => setSelectedTaskForDetail(task)}
+                              onClick={() => setSelectedTaskId(task.id)}
                               className={cn(
-                                "bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden shadow-lg transition-all duration-300 group cursor-pointer hover:bg-[var(--surface-hover)] relative",
+                                "bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden shadow-lg transition-all duration-300 group cursor-pointer hover:bg-[var(--surface-hover)] relative w-full min-w-0",
                                 task.status === "completed" ? "opacity-60" : "",
-                                viewMode === 'list' ? "p-3" : "p-4"
+                                viewMode === 'list' ? "p-3" : "p-3.5 sm:p-4"
                               )}
                               style={{
                                 borderLeft: `3px solid ${task.status === 'completed' ? '#444' : (theme === 'light' ? 'var(--accent)' : selectedProject.color)}`,
@@ -813,7 +921,7 @@ export default function DashboardContent({
                                 className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none"
                                 style={{ background: `radial-gradient(circle at center, ${selectedProject.color}, transparent 70%)` }}
                               />
-                              <div className={cn("flex items-start", viewMode === 'list' ? "gap-3" : "gap-4")}>
+                              <div className={cn("flex items-start w-full min-w-0", viewMode === 'list' ? "gap-2.5 sm:gap-3" : "gap-3 sm:gap-4")}>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleToggleTask(task); }}
                                   className={cn("flex-shrink-0 transition-colors", 
@@ -825,37 +933,49 @@ export default function DashboardContent({
                                 </button>
 
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between gap-4">
+                                  <div className="flex items-start justify-between gap-2 sm:gap-4 w-full min-w-0">
                                     <div className={cn(
-                                      "font-semibold leading-tight break-words", 
+                                      "flex-1 min-w-0 font-semibold leading-tight break-words [overflow-wrap:anywhere]", 
                                       task.status === "completed" ? "text-[#888] line-through" : "text-[var(--foreground)]",
-                                      viewMode === 'list' ? "text-sm" : "text-lg mb-1"
+                                      viewMode === 'list' ? "text-sm" : "text-base sm:text-lg mb-1"
                                     )}>
                                       {viewMode === 'list' ? task.title : renderContent(task.title, task.attachments)}
                                     </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all">
-                                      <button onClick={(e) => { e.stopPropagation(); openEditTask(task); }} className="p-1.5 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--accent)]/20 bg-[var(--background)] rounded-md transition-all"><Edit2 size={12} /></button>
-                                      <button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} className="p-1.5 text-[#888] hover:text-red-500 hover:bg-red-600/20 bg-[var(--background)] rounded-md transition-all"><Trash2 size={12} /></button>
+                                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); openEditTask(task); }} 
+                                        className="p-1.5 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--accent)]/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
+                                        title="Editar tarefa"
+                                      >
+                                        <Edit2 size={13} />
+                                      </button>
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} 
+                                        className="p-1.5 text-[#888] hover:text-red-500 hover:bg-red-600/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
+                                        title="Excluir tarefa"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
                                     </div>
                                   </div>
 
                                   {viewMode === 'card' && task.description && (
-                                    <p className="text-xs text-[var(--foreground)] opacity-70 line-clamp-2 leading-relaxed font-medium">
+                                    <p className="text-xs text-[var(--foreground)] opacity-70 line-clamp-2 leading-relaxed font-medium break-words [overflow-wrap:anywhere]">
                                       {task.description}
                                     </p>
                                   )}
 
                                   {viewMode === 'card' && lastLog && (
-                                    <div className="mt-2 flex items-center gap-2 text-[#888]">
+                                    <div className="mt-2 flex items-center gap-2 text-[#888] min-w-0">
                                       <MessageSquare size={12} className="flex-shrink-0" />
-                                      <p className="text-xs truncate italic">
+                                      <p className="text-xs truncate italic break-all">
                                         {lastLog.content.replace(/!\[.*?\]\(.*?\)/g, "[Anexo]")}
                                       </p>
                                     </div>
                                   )}
 
-                                  <div className={cn("flex items-center justify-between", viewMode === 'list' ? "mt-1.5" : "mt-3")}>
-                                    <div className="flex items-center gap-2 overflow-hidden">
+                                  <div className={cn("flex items-center justify-between gap-2", viewMode === 'list' ? "mt-1.5" : "mt-3")}>
+                                    <div className="flex items-center gap-1.5 overflow-hidden">
                                       {task.attachments.length > 0 && viewMode === 'list' && (
                                         <span title="Possui anexos">
                                           <Plus size={12} className="text-[var(--accent)]" />
@@ -868,7 +988,7 @@ export default function DashboardContent({
                                             key={tag}
                                             className={cn(
                                               "font-black rounded-full uppercase border transition-all truncate",
-                                              viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-2.5 py-0.5 text-[10px]"
+                                              viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-2 py-0.5 text-[9px] sm:text-[10px]"
                                             )}
                                             style={{
                                               backgroundColor: `${tagColor}15`,
@@ -881,24 +1001,24 @@ export default function DashboardContent({
                                         );
                                       })}
                                     </div>
-                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                                       <span
                                         className={cn(
-                                          "font-bold uppercase tracking-widest flex items-center gap-1.5 px-2 py-0.5 rounded border transition-all",
+                                          "font-bold uppercase tracking-widest flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded border transition-all",
                                           viewMode === 'list' 
                                             ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)] shadow-sm" 
-                                            : "text-[10px]"
+                                            : "text-[9px] sm:text-[10px]"
                                         )}
                                         style={{ 
                                           color: logCount > 0 ? (theme === 'light' ? 'var(--accent)' : selectedProject.color) : '#666',
                                           borderColor: logCount > 0 ? (theme === 'light' ? 'var(--accent)40' : `${selectedProject.color}40`) : 'transparent'
                                         }}
                                       >
-                                        <MessageSquare size={viewMode === 'list' ? 10 : 11} /> {logCount} {logCount === 1 ? 'Andamento' : 'Andamentos'}
+                                        <MessageSquare size={10} /> {logCount}
                                       </span>
                                       <span className={cn(
                                         "font-bold text-[var(--accent)] bg-[var(--accent)]/10 rounded border border-[var(--accent)]/20 shadow-sm",
-                                        viewMode === 'list' ? "px-1.5 py-0 text-[9px]" : "px-2 py-0.5 text-[10px]"
+                                        viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px]"
                                       )}>
                                         {new Date(task.createdAt).toLocaleDateString()}
                                       </span>
@@ -915,20 +1035,23 @@ export default function DashboardContent({
                 </div>
 
                 {/* COLUNA DIREITA: NOTAS (BLOQUINHOS) */}
-                <div className="flex flex-col h-full min-h-0 xl:border-l xl:border-[#1a1a1a] xl:pl-10">
-                  <div className="flex-1 overflow-y-auto no-scrollbar pr-2 pb-20">
-                    <div className="flex items-center justify-between mb-6 bg-[var(--background)]/60 p-4 rounded-2xl border border-[var(--border)] shadow-inner">
-                      <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[var(--accent)]">Notas do Projeto</h3>
+                <div className={cn(
+                  "flex-col h-full min-h-0 w-full min-w-0 xl:border-l xl:border-[#1a1a1a] xl:pl-10",
+                  mobileTab === 'notes' ? "flex" : "hidden xl:flex"
+                )}>
+                  <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar pr-1 sm:pr-2 pb-20 w-full min-w-0">
+                    <div className="flex items-center justify-between mb-4 sm:mb-6 bg-[var(--background)]/60 p-3 sm:p-4 rounded-2xl border border-[var(--border)] shadow-inner w-full min-w-0 gap-2">
+                      <h3 className="text-xs font-black uppercase tracking-[0.15em] sm:tracking-[0.3em] text-[var(--accent)] truncate">Notas do Projeto</h3>
                       <button
                         onClick={() => { setIsNoteModalOpen(true); setNewNoteContent(""); }}
-                        className="px-4 py-2 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 transition-all flex items-center gap-2 active:scale-95"
+                        className="px-3 py-2 sm:px-4 sm:py-2 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 flex-shrink-0"
                       >
                         <Plus size={14} /> Nova Nota
                       </button>
                     </div>
 
                     {/* Grid de Notas (Bloquinhos) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 p-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 p-1 sm:p-2">
                       {initialNotes.length === 0 ? (
                         <div className="col-span-full py-24 text-center opacity-10 flex flex-col items-center gap-4">
                           <Plus size={48} strokeWidth={1} />
@@ -939,17 +1062,17 @@ export default function DashboardContent({
                           <div
                             key={note.id}
                             className={cn(
-                              "p-8 shadow-[10px_10px_20px_rgba(0,0,0,0.5)] relative transition-all group hover:-translate-y-3 hover:shadow-[20px_20px_40px_rgba(0,0,0,0.6)] flex flex-col",
-                              idx % 3 === 0 ? "-rotate-2" : idx % 3 === 1 ? "rotate-1" : "rotate-2",
-                              "border-t-[25px] border-amber-200/30"
+                              "p-5 sm:p-8 shadow-[10px_10px_20px_rgba(0,0,0,0.5)] relative transition-all group hover:-translate-y-3 hover:shadow-[20px_20px_40px_rgba(0,0,0,0.6)] flex flex-col",
+                              idx % 3 === 0 ? "sm:-rotate-2 rotate-0" : idx % 3 === 1 ? "sm:rotate-1 rotate-0" : "sm:rotate-2 rotate-0",
+                              "border-t-[18px] sm:border-t-[25px] border-amber-200/30"
                             )}
                             style={{
                               backgroundColor: idx % 2 === 0 ? '#fef3c7' : '#fde68a',
-                              minHeight: '240px'
+                              minHeight: '200px'
                             }}
                           >
                             {/* Efeito de fita adesiva */}
-                            <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-16 h-8 bg-white/20 backdrop-blur-[1px] -rotate-1 border border-white/10" />
+                            <div className="absolute -top-4 sm:-top-5 left-1/2 -translate-x-1/2 w-14 sm:w-16 h-6 sm:h-8 bg-white/20 backdrop-blur-[1px] -rotate-1 border border-white/10" />
 
                             {editingNoteId === note.id ? (
                               <div className="flex-1 flex flex-col">
@@ -959,21 +1082,21 @@ export default function DashboardContent({
                                   value={editingNoteContent}
                                   onChange={(e) => setEditingNoteContent(e.target.value)}
                                 />
-                                <div className="flex justify-end gap-3 mt-6">
+                                <div className="flex justify-end gap-3 mt-4 sm:mt-6">
                                   <button onClick={() => setEditingNoteId(null)} className="text-[10px] font-black uppercase text-amber-900/40 hover:text-amber-900 transition-colors">Sair</button>
                                   <button onClick={() => handleUpdateNote(note.id)} className="px-4 py-2 bg-amber-950 text-[#fef3c7] text-[10px] font-black uppercase rounded shadow-xl hover:bg-black transition-all">Salvar</button>
                                 </div>
                               </div>
                             ) : (
                               <>
-                                <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-all z-20">
-                                  <button onClick={() => { setEditingNoteId(note.id); setEditingNoteContent(note.content); }} className="p-2 text-amber-950/20 hover:text-amber-900 transition-colors"><Edit2 size={12} /></button>
-                                  <button onClick={() => handleDeleteNote(note.id)} className="p-2 text-amber-950/20 hover:text-red-700 transition-colors"><Trash2 size={12} /></button>
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all z-20">
+                                  <button onClick={() => { setEditingNoteId(note.id); setEditingNoteContent(note.content); }} className="p-1.5 bg-black/10 rounded-lg text-amber-950 hover:text-amber-900 transition-colors" title="Editar nota"><Edit2 size={13} /></button>
+                                  <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 bg-black/10 rounded-lg text-amber-950 hover:text-red-700 transition-colors" title="Excluir nota"><Trash2 size={13} /></button>
                                 </div>
-                                <div className="text-[16px] text-amber-950 leading-relaxed whitespace-pre-wrap font-bold flex-1">
+                                <div className="text-[15px] sm:text-[16px] text-amber-950 leading-relaxed whitespace-pre-wrap font-bold flex-1 pt-1">
                                   {note.content}
                                 </div>
-                                <div className="mt-8 pt-4 border-t border-amber-950/5 flex items-center justify-between text-amber-950/70">
+                                <div className="mt-6 sm:mt-8 pt-3 sm:pt-4 border-t border-amber-950/5 flex items-center justify-between text-amber-950/70">
                                   <span className="text-[9px] font-black uppercase tracking-[0.2em]">
                                     {new Date(note.createdAt).toLocaleDateString()}
                                   </span>
@@ -1002,41 +1125,47 @@ export default function DashboardContent({
               </button>
               <h1 className="ml-4 text-lg font-bold text-[var(--foreground)] tracking-tight">Project Notes</h1>
             </header>
-            <div className="flex-1 flex items-center justify-center bg-[var(--background)] p-8">
-            <div className="max-w-md w-full text-center space-y-8 animate-in fade-in zoom-in duration-500">
+            <div className="flex-1 flex items-center justify-center bg-[var(--background)] p-4 sm:p-8">
+            <div className="max-w-md w-full text-center space-y-6 sm:space-y-8 animate-in fade-in zoom-in duration-500">
               <div className="relative inline-block">
                 <div className="absolute inset-0 bg-[var(--accent)]/20 blur-3xl rounded-full" />
-                <div className="relative w-24 h-24 bg-[var(--surface)] border border-[var(--border)] rounded-[32px] flex items-center justify-center mx-auto shadow-2xl mb-6">
-                  <LayoutGrid size={40} className="text-[var(--accent)]" />
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-[var(--surface)] border border-[var(--border)] rounded-[24px] sm:rounded-[32px] flex items-center justify-center mx-auto shadow-2xl mb-4 sm:mb-6">
+                  <LayoutGrid size={36} className="text-[var(--accent)]" />
                 </div>
               </div>
               <div>
-                <h2 className="text-3xl font-black text-[var(--foreground)] mb-3 tracking-tight">Project Notes</h2>
-                <p className="text-[#888] font-medium leading-relaxed">
-                  Bem-vindo de volta! Selecione um projeto na barra lateral para começar a gerenciar suas tarefas e notas, ou crie um novo.
+                <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] mb-2 sm:mb-3 tracking-tight">Project Notes</h2>
+                <p className="text-xs sm:text-sm text-[#888] font-medium leading-relaxed">
+                  Bem-vindo de volta! Selecione um projeto na barra lateral para gerenciar suas tarefas e notas, ou crie um novo workspace.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group">
-                  <div className="w-10 h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Plus size={20} className="text-[var(--accent)]" />
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
+                <div 
+                  onClick={() => setIsProjectModalOpen(true)}
+                  className="p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
+                >
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
+                    <Plus size={18} className="text-[var(--accent)]" />
                   </div>
-                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">Novo Projeto</h3>
+                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 sm:mb-1">Novo Projeto</h3>
                   <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Crie seu workspace</p>
                 </div>
-                <div className="p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group">
-                  <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Search size={20} className="text-emerald-500" />
+                <div 
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
+                >
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
+                    <Search size={18} className="text-emerald-500" />
                   </div>
-                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-1">Localizar</h3>
-                  <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Busque em tudo</p>
+                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 sm:mb-1">Ver Projetos</h3>
+                  <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Navegue no menu</p>
                 </div>
               </div>
               
               {initialProjects.length === 0 && (
                 <button
                   onClick={() => setIsProjectModalOpen(true)}
-                  className="mt-8 px-8 py-4 bg-[var(--accent)] text-[var(--background)] font-black uppercase text-xs rounded-2xl shadow-[0_10px_20px_var(--accent-30)] hover:scale-105 active:scale-95 transition-all tracking-widest"
+                  className="mt-6 sm:mt-8 px-6 sm:px-8 py-3.5 sm:py-4 bg-[var(--accent)] text-[var(--background)] font-black uppercase text-xs rounded-2xl shadow-[0_10px_20px_var(--accent-30)] hover:scale-105 active:scale-95 transition-all tracking-widest"
                 >
                   Começar Agora
                 </button>
@@ -1049,40 +1178,57 @@ export default function DashboardContent({
 
       {/* DETALHE DA TAREFA (OVERLAY) */}
       {selectedTaskForDetail && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 lg:p-10">
-          <div className="absolute inset-0 bg-[var(--backdrop,black)]/85 backdrop-blur-md" onClick={() => setSelectedTaskForDetail(null)} />
-          <div className="relative w-full max-w-4xl max-h-full bg-[var(--surface)] border border-[var(--border)] rounded-[32px] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden scale-in-center">
-            <header className="h-16 lg:h-20 border-b border-[var(--border)] px-4 lg:px-8 flex items-center justify-between flex-shrink-0 bg-[var(--sidebar)]">
-              <div className="flex items-center gap-4">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-10">
+          <div className="absolute inset-0 bg-[var(--backdrop,black)]/85 backdrop-blur-md" onClick={() => setSelectedTaskId(null)} />
+          <div className="relative w-full max-w-4xl h-[92vh] sm:h-auto sm:max-h-[90vh] bg-[var(--surface)] border-t sm:border border-[var(--border)] rounded-t-[28px] sm:rounded-[32px] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden scale-in-center">
+            <header className="h-14 sm:h-16 lg:h-20 border-b border-[var(--border)] px-3 sm:px-6 lg:px-8 flex items-center justify-between flex-shrink-0 bg-[var(--sidebar)]">
+              <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                 <button
-                  onClick={() => setSelectedTaskForDetail(null)}
-                  className="p-2 -ml-2 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-full transition-all"
+                  onClick={() => setSelectedTaskId(null)}
+                  className="p-1.5 sm:p-2 -ml-1 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-full transition-all"
+                  title="Fechar"
                 >
                   <X size={20} />
                 </button>
-                <h2 className="text-xl font-bold text-[var(--foreground)]">Detalhes da Tarefa</h2>
+                <h2 className="text-base sm:text-xl font-bold text-[var(--foreground)] truncate">Detalhes da Tarefa</h2>
               </div>
-              <div className="flex items-center gap-2 lg:gap-3">
-                <button onClick={() => openEditTask(selectedTaskForDetail)} className="p-2 lg:px-4 lg:py-2 bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-sm font-bold rounded-lg border border-[var(--border)] flex items-center gap-2 text-[#888] hover:text-[var(--foreground)]">
-                  <Edit2 size={14} /> <span className="hidden sm:inline">Editar Tarefa</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0">
+                <button 
+                  onClick={() => openEditTask(selectedTaskForDetail)} 
+                  className="p-2 sm:px-3 sm:py-2 bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-xs sm:text-sm font-bold rounded-lg border border-[var(--border)] flex items-center gap-1.5 text-[#888] hover:text-[var(--foreground)] transition-all" 
+                  title="Editar Tarefa"
+                >
+                  <Edit2 size={13} /> <span className="hidden sm:inline">Editar</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    if (confirm("Excluir esta tarefa?")) {
+                      handleDeleteTask(selectedTaskForDetail.id);
+                      setSelectedTaskId(null);
+                    }
+                  }} 
+                  className="p-2 sm:px-3 sm:py-2 bg-red-500/10 hover:bg-red-500/20 text-xs sm:text-sm font-bold rounded-lg border border-red-500/20 flex items-center gap-1.5 text-red-400 transition-all" 
+                  title="Excluir Tarefa"
+                >
+                  <Trash2 size={13} /> <span className="hidden sm:inline">Excluir</span>
                 </button>
                 <button
-                  onClick={() => { handleToggleTask(selectedTaskForDetail); setSelectedTaskForDetail(null); }}
+                  onClick={() => { handleToggleTask(selectedTaskForDetail); setSelectedTaskId(null); }}
                   className={cn(
-                    "px-3 lg:px-4 lg:py-2 text-xs lg:text-sm font-bold rounded-lg flex items-center gap-2",
-                    selectedTaskForDetail.status === "completed" ? "bg-emerald-500/20 text-emerald-400" : "bg-[var(--accent)] text-[var(--background)]"
+                    "px-2.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold rounded-lg flex items-center gap-1.5 transition-all",
+                    selectedTaskForDetail.status === "completed" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-[var(--accent)] text-[var(--background)] shadow-md"
                   )}
                 >
-                  <CheckCircle2 size={16} /> <span className="hidden sm:inline">{selectedTaskForDetail.status === "completed" ? "Reabrir" : "Concluir"}</span>
+                  <CheckCircle2 size={15} /> <span className="hidden sm:inline">{selectedTaskForDetail.status === "completed" ? "Reabrir" : "Concluir"}</span>
                 </button>
               </div>
             </header>
 
-            <div className="flex-1 overflow-y-auto p-8 no-scrollbar">
-              <div className="max-w-3xl mx-auto space-y-10">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 no-scrollbar">
+              <div className="max-w-3xl mx-auto space-y-6 sm:space-y-10">
                 {/* Cabeçalho da Tarefa no Detalhe */}
                 <section>
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-1.5 mb-2.5">
                     {selectedTaskForDetail.tags.map(tag => {
                       const tagColor = getTagColor(tag);
                       return (
@@ -1100,11 +1246,11 @@ export default function DashboardContent({
                       );
                     })}
                   </div>
-                  <div className="text-2xl font-bold text-[var(--foreground)] leading-tight mb-3">
+                  <div className="text-xl sm:text-2xl font-bold text-[var(--foreground)] leading-tight mb-3">
                     {renderContent(selectedTaskForDetail.title, selectedTaskForDetail.attachments)}
                   </div>
                   {selectedTaskForDetail.description && (
-                    <div className="mb-6 p-5 bg-[var(--background)]/40 rounded-2xl border border-[var(--border)] shadow-lg">
+                    <div className="mb-4 sm:mb-6 p-4 sm:p-5 bg-[var(--background)]/40 rounded-2xl border border-[var(--border)] shadow-lg">
                       <p className="text-sm text-[var(--foreground)] leading-relaxed font-semibold italic opacity-70">
                         {selectedTaskForDetail.description}
                       </p>
@@ -1116,41 +1262,41 @@ export default function DashboardContent({
                 <div className="h-px bg-[var(--border)]" />
 
                 {/* Histórico de Andamentos */}
-                <section className="space-y-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-[#888] uppercase tracking-widest flex items-center gap-2">
+                <section className="space-y-4 sm:space-y-6">
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <h3 className="text-xs sm:text-sm font-bold text-[#888] uppercase tracking-widest flex items-center gap-2">
                       <MessageSquare size={16} className="text-[var(--accent)]" /> Andamentos ({selectedTaskForDetail.logs.length})
                     </h3>
                     <button
                       onClick={() => setIsAddingLog(!isAddingLog)}
                       className={cn(
-                        "px-4 py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-2 active:scale-95 shadow-lg border",
+                        "px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 shadow-lg border",
                         isAddingLog 
                           ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20" 
                           : "bg-[var(--accent)] border-[var(--accent)] text-[var(--background)] hover:opacity-90"
                       )}
                     >
-                      {isAddingLog ? <X size={14} strokeWidth={3} /> : <Plus size={14} strokeWidth={3} />}
+                      {isAddingLog ? <X size={13} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
                       {isAddingLog ? "Cancelar" : "Registrar Andamento"}
                     </button>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     {selectedTaskForDetail.logs.map((log) => (
                       <div
                         key={log.id}
-                        className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6 shadow-md group hover:border-[var(--accent)]/30 transition-all relative overflow-hidden"
+                        className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-md group hover:border-[var(--accent)]/30 transition-all relative overflow-hidden"
                       >
                         {/* Background glow sutil para o log */}
                         <div
                           className="absolute top-0 right-0 w-32 h-32 opacity-[0.03] pointer-events-none"
                           style={{ background: `radial-gradient(circle at top right, ${selectedProject?.color}, transparent)` }}
                         />
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex items-center gap-3">
+                        <div className="flex justify-between items-start mb-2 sm:mb-3">
+                          <div className="flex items-center gap-2 sm:gap-3">
                             {log.type === "blocker" && (
                               <div
-                                className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider"
+                                className="px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider"
                                 style={{
                                   backgroundColor: "#ef444420",
                                   color: "#ef4444"
@@ -1162,16 +1308,18 @@ export default function DashboardContent({
                             <span className="text-[10px] font-bold text-[#888]">{new Date(log.createdAt).toLocaleString()}</span>
                           </div>
 
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                          <div className="flex items-center gap-1 sm:gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
                             <button
                               onClick={() => { setEditingLogId(log.id); setEditingLogContent(log.content); }}
-                              className="p-1 text-[#555] hover:text-blue-400 transition-colors"
+                              className="p-1.5 text-[#666] hover:text-blue-400 transition-colors"
+                              title="Editar andamento"
                             >
                               <Edit2 size={12} />
                             </button>
                             <button
                               onClick={() => handleDeleteLog(log.id)}
-                              className="p-1 text-[#555] hover:text-red-400 transition-colors"
+                              className="p-1.5 text-[#666] hover:text-red-400 transition-colors"
+                              title="Excluir andamento"
                             >
                               <Trash2 size={12} />
                             </button>
@@ -1202,14 +1350,15 @@ export default function DashboardContent({
                 </section>
               </div>
             </div>
+
             {isAddingLog && (
-              <footer className="p-6 bg-[var(--sidebar)] border-t border-[var(--border)] animate-in slide-in-from-bottom duration-300">
-                <div className="max-w-3xl mx-auto space-y-4">
-                  {/* Preview de Imagens em Tempo Real */}
+              <footer className="p-3 sm:p-6 bg-[var(--sidebar)] border-t border-[var(--border)] animate-in slide-in-from-bottom duration-300">
+                <div className="max-w-3xl mx-auto space-y-3">
+                  {/* Preview de Anexos */}
                   {tempLogAttachments.length > 0 && (
                     <div id="log-preview">
                       <div className="flex items-center justify-between mb-2">
-                        <p className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest text-glow">Anexos ({tempLogAttachments.length})</p>
+                        <p className="text-[10px] font-bold text-[var(--accent)] uppercase tracking-widest">Anexos ({tempLogAttachments.length})</p>
                         <button onClick={() => setTempLogAttachments([])} className="text-[10px] text-[#555] hover:text-[var(--foreground)] transition-colors uppercase font-bold">Limpar tudo</button>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -1218,16 +1367,16 @@ export default function DashboardContent({
                           return (
                             <div key={i} className="relative group">
                               {isImg ? (
-                                <img src={url} className="w-16 h-16 object-cover rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all" />
+                                <img src={url} className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all" />
                               ) : (
-                                <div className="w-16 h-16 bg-[var(--surface)] flex flex-col items-center justify-center rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all text-[var(--accent)]">
+                                <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[var(--surface)] flex flex-col items-center justify-center rounded-lg border border-[#333] hover:border-[var(--accent)]/50 transition-all text-[var(--accent)]">
                                   {getFileIcon(url)}
                                   <span className="text-[8px] font-black">{url.split('.').pop()?.split('?')[0].toUpperCase()}</span>
                                 </div>
                               )}
                               <button
                                 onClick={() => setTempLogAttachments(prev => prev.filter((_, idx) => idx !== i))}
-                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                               >
                                 <X size={10} />
                               </button>
@@ -1238,57 +1387,64 @@ export default function DashboardContent({
                     </div>
                   )}
 
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold text-[#666] uppercase tracking-[0.2em]">Novo Andamento</p>
-                      <div className="flex items-center gap-2">
-                        <label className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
-                          <Plus size={14} /> Anexar Arquivo
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf,text/xml,text/html,text/csv,text/plain"
-                            className="hidden"
-                            onChange={(e) => handleFileChange(e, (url) => setTempLogAttachments(prev => [...prev, url]))}
-                          />
-                        </label>
-                        <button 
-                          onClick={() => setIsAddingLog(false)}
-                          className="p-1.5 text-[#555] hover:text-[var(--foreground)] transition-colors"
-                          title="Fechar"
-                        >
-                          <X size={18} />
-                        </button>
-                      </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-bold text-[#666] uppercase tracking-[0.2em]">Novo Andamento</p>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
+                        <Plus size={13} /> Anexar Arquivo
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf,text/xml,text/html,text/csv,text/plain"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, (url) => setTempLogAttachments(prev => [...prev, url]))}
+                        />
+                      </label>
+                      <button 
+                        onClick={() => setIsAddingLog(false)}
+                        className="p-1.5 text-[#555] hover:text-[var(--foreground)] transition-colors"
+                        title="Fechar"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
-                    <div className="relative group">
-                      <textarea
-                        autoFocus
-                        placeholder="Descreva o andamento... Cole prints (Ctrl+V) 📋"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            const content = e.currentTarget.value;
-                            const target = e.currentTarget;
-                            if (!content && tempLogAttachments.length === 0) return;
+                  </div>
 
-                            startTransition(async () => {
-                              await createLog(selectedTaskForDetail.id, content, "note", tempLogAttachments);
-                              target.value = "";
-                              setTempLogAttachments([]);
-                              setIsAddingLog(false);
-                            });
-                          }
-                        }}
-                        onPaste={(e) => {
-                          handlePaste(e, (url) => {
-                            setTempLogAttachments(prev => [...prev, url]);
-                          });
-                        }}
-                        className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-5 py-4 text-[15px] text-[var(--foreground)] placeholder-[#444] focus:outline-none focus:border-[var(--accent)] transition-all resize-none min-h-[120px]"
-                      />
-                      <div className="absolute bottom-4 right-4 text-[10px] font-bold text-[#444] uppercase pointer-events-none group-hover:text-[#666] transition-all">
-                        Pressione ENTER para registrar o andamento
-                      </div>
-                    </div>
+                  <div className="relative group">
+                    <textarea
+                      autoFocus
+                      placeholder="Descreva o andamento... Cole prints (Ctrl+V) 📋"
+                      value={newLogContent}
+                      onChange={(e) => setNewLogContent(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          handleCreateLog();
+                        }
+                      }}
+                      onPaste={(e) => {
+                        handlePaste(e, (url) => {
+                          setTempLogAttachments(prev => [...prev, url]);
+                        });
+                      }}
+                      className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-3 text-base sm:text-sm text-[var(--foreground)] placeholder-[#444] focus:outline-none focus:border-[var(--accent)] transition-all resize-none min-h-[90px] sm:min-h-[110px]"
+                    />
+                  </div>
+
+                  {/* Action Button for Touch and Desktop */}
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <span className="text-[10px] text-[#555] hidden sm:inline">
+                      Pressione ENTER para enviar ou toque no botão ao lado
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCreateLog}
+                      disabled={(!newLogContent.trim() && tempLogAttachments.length === 0) || isPending}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-[var(--accent)] hover:opacity-90 disabled:opacity-40 text-[var(--background)] font-bold text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ml-auto"
+                    >
+                      <Send size={14} />
+                      <span>Registrar Andamento</span>
+                    </button>
+                  </div>
                 </div>
               </footer>
             )}
@@ -1298,28 +1454,29 @@ export default function DashboardContent({
 
       {/* MODALS */}
       {(isProjectModalOpen || editingProject) && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-4">
-          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-md rounded-2xl p-8 shadow-2xl scale-in-center">
-            <h2 className="text-2xl font-bold mb-6">{editingProject ? "Editar Projeto" : "Novo Projeto"}</h2>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-3 sm:p-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-md rounded-2xl p-5 sm:p-8 shadow-2xl scale-in-center">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{editingProject ? "Editar Projeto" : "Novo Projeto"}</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-[#888] mb-1">Nome do Projeto</label>
+                <label className="block text-xs sm:text-sm font-medium text-[#888] mb-1.5">Nome do Projeto</label>
                 <input
                   autoFocus
-                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg px-4 py-3 outline-none focus:border-[var(--accent)]"
+                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 text-base sm:text-sm outline-none focus:border-[var(--accent)]"
                   value={newProjectName}
                   onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="Nome do projeto..."
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2.5 sm:gap-3 pt-2 sm:pt-4">
                 <button
                   onClick={() => { setIsProjectModalOpen(false); setEditingProject(null); }}
-                  className="flex-1 py-3 bg-[#222222] hover:bg-[#333333] rounded-xl transition-all"
+                  className="flex-1 py-2.5 sm:py-3 bg-[#222222] hover:bg-[#333333] text-xs sm:text-sm rounded-xl transition-all font-medium"
                 >Cancelar</button>
                 <button
                   onClick={editingProject ? handleUpdateProject : handleCreateProject}
                   disabled={isPending}
-                  className="flex-1 py-3 bg-[var(--accent)] hover:bg-[var(--accent)] rounded-xl transition-all font-bold disabled:opacity-50"
+                  className="flex-1 py-2.5 sm:py-3 bg-[var(--accent)] hover:bg-[var(--accent)] text-xs sm:text-sm rounded-xl transition-all font-bold disabled:opacity-50"
                 >{editingProject ? "Salvar" : "Criar"}</button>
               </div>
             </div>
@@ -1328,15 +1485,15 @@ export default function DashboardContent({
       )}
 
       {isTaskModalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-4">
-          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-md rounded-2xl p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-6">{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</h2>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-3 sm:p-4">
+          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-md rounded-2xl p-5 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</h2>
             <div className="space-y-4">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-sm font-medium text-[#888]">Título da Tarefa</label>
-                  <label className="flex items-center gap-1.5 px-3 py-1 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
-                    <Plus size={14} /> Anexar Arquivo
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs sm:text-sm font-medium text-[#888]">Título da Tarefa</label>
+                  <label className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-black uppercase rounded-lg border border-[var(--accent)]/30 cursor-pointer transition-all active:scale-95 shadow-sm">
+                    <Plus size={13} /> Anexar Arquivo
                     <input
                       type="file"
                       accept="image/*,application/pdf,text/xml,text/html,text/csv,text/plain"
@@ -1359,7 +1516,12 @@ export default function DashboardContent({
                               <span className="text-[8px] font-black">{url.split('.').pop()?.split('?')[0].toUpperCase()}</span>
                             </div>
                           )}
-                          <button onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={10} /></button>
+                          <button 
+                            onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))} 
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          >
+                            <X size={10} />
+                          </button>
                         </div>
                       );
                     })}
@@ -1367,7 +1529,7 @@ export default function DashboardContent({
                 )}
                 <textarea
                   autoFocus
-                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 outline-none focus:border-[var(--accent)] resize-none min-h-[80px] transition-all"
+                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 outline-none focus:border-[var(--accent)] resize-none min-h-[80px] text-base sm:text-sm transition-all"
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
                   onPaste={(e) => {
@@ -1379,18 +1541,18 @@ export default function DashboardContent({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#888] mb-1">Descrição (opcional)</label>
+                <label className="block text-xs sm:text-sm font-medium text-[#888] mb-1.5">Descrição (opcional)</label>
                 <textarea
-                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg px-4 py-3 outline-none focus:border-[var(--accent)] resize-none min-h-[60px] text-sm"
+                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-3 outline-none focus:border-[var(--accent)] resize-none min-h-[60px] text-base sm:text-sm"
                   value={newTaskDescription}
                   onChange={(e) => setNewTaskDescription(e.target.value)}
                   placeholder="Mais detalhes sobre o que precisa ser feito..."
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#888] mb-1">Tags (separadas por vírgula)</label>
+                <label className="block text-xs sm:text-sm font-medium text-[#888] mb-1.5">Tags (separadas por vírgula)</label>
                 <input
-                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg px-4 py-3 outline-none focus:border-[var(--accent)]"
+                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--accent)] text-base sm:text-sm"
                   placeholder="ex: design, backend, urgente"
                   value={newTaskTags}
                   onChange={(e) => setNewTaskTags(e.target.value)}
@@ -1399,33 +1561,34 @@ export default function DashboardContent({
                 <datalist id="tag-suggestions">
                   {allUniqueTags.map(tag => <option key={tag} value={tag} />)}
                 </datalist>
-                <p className="text-[10px] text-[#555] mt-2">Sugestões: {allUniqueTags.join(", ")}</p>
+                <p className="text-[10px] text-[#555] mt-1.5 truncate">Sugestões: {allUniqueTags.join(", ")}</p>
               </div>
-              <div className="flex gap-3 pt-4">
-                <button onClick={() => { setIsTaskModalOpen(false); setEditingTask(null); }} className="flex-1 py-3 bg-[#222222] hover:bg-[#333333] rounded-xl transition-all">Cancelar</button>
-                <button onClick={handleCreateTask} disabled={isPending} className="flex-1 py-3 bg-[var(--accent)] hover:bg-[var(--accent)] rounded-xl transition-all font-bold disabled:opacity-50">
-                  {editingTask ? "Salvar Alterações" : "Criar Tarefa"}
+              <div className="flex gap-2.5 sm:gap-3 pt-2 sm:pt-4">
+                <button onClick={() => { setIsTaskModalOpen(false); setEditingTask(null); }} className="flex-1 py-2.5 sm:py-3 bg-[#222222] hover:bg-[#333333] text-xs sm:text-sm rounded-xl transition-all font-medium">Cancelar</button>
+                <button onClick={handleCreateTask} disabled={isPending} className="flex-1 py-2.5 sm:py-3 bg-[var(--accent)] hover:bg-[var(--accent)] text-xs sm:text-sm rounded-xl transition-all font-bold disabled:opacity-50">
+                  {editingTask ? "Salvar" : "Criar Tarefa"}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
       {/* MODAL DE NOVA NOTA */}
       {isNoteModalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-4">
-          <div className="bg-[#fef9c3] p-10 shadow-[20px_20px_60px_rgba(0,0,0,0.5)] relative -rotate-1 w-full max-w-xl border-t-[40px] border-amber-200/50 scale-in-center">
-            <div className="absolute -top-8 left-1/2 -translate-x-1/2 w-32 h-12 bg-white/40 backdrop-blur-sm -rotate-2 border border-white/20 shadow-sm z-10" />
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-3 sm:p-4">
+          <div className="bg-[#fef9c3] p-5 sm:p-10 shadow-[20px_20px_60px_rgba(0,0,0,0.5)] relative rotate-0 sm:-rotate-1 w-full max-w-xl border-t-[24px] sm:border-t-[40px] border-amber-200/50 rounded-b-xl scale-in-center">
+            <div className="hidden sm:block absolute -top-8 left-1/2 -translate-x-1/2 w-32 h-12 bg-white/40 backdrop-blur-sm -rotate-2 border border-white/20 shadow-sm z-10" />
             <button
               onClick={() => setIsNoteModalOpen(false)}
-              className="absolute top-2 right-4 text-amber-900/20 hover:text-amber-900 transition-all p-1"
+              className="absolute top-1.5 sm:top-2 right-2 sm:right-4 text-amber-900/40 hover:text-amber-900 transition-all p-1"
             >
               <X size={20} />
             </button>
             <textarea
               autoFocus
               placeholder="Descreva sua ideia ou nota aqui..."
-              className="w-full bg-transparent border-none outline-none text-[20px] text-amber-950 placeholder-amber-900/10 resize-none min-h-[250px] font-bold leading-relaxed"
+              className="w-full bg-transparent border-none outline-none text-[16px] sm:text-[20px] text-amber-950 placeholder-amber-900/20 resize-none min-h-[180px] sm:min-h-[250px] font-bold leading-relaxed pt-2"
               value={newNoteContent}
               onChange={(e) => setNewNoteContent(e.target.value)}
               onKeyDown={(e) => {
@@ -1435,19 +1598,19 @@ export default function DashboardContent({
                 }
               }}
             />
-            <div className="flex justify-between items-center mt-8 pt-8 border-t border-amber-950/5">
-              <span className="text-[11px] text-amber-900/30 font-black uppercase tracking-widest">Ctrl + Enter para fixar</span>
-              <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mt-4 sm:mt-8 pt-4 sm:pt-8 border-t border-amber-950/10">
+              <span className="text-[11px] text-amber-900/40 font-black uppercase tracking-widest hidden sm:inline">Ctrl + Enter para fixar</span>
+              <div className="flex gap-2 sm:gap-4 justify-end">
                 <button
                   onClick={() => setIsNoteModalOpen(false)}
-                  className="px-6 py-3 text-amber-900/40 hover:text-amber-900 text-[11px] font-black uppercase transition-all"
+                  className="px-4 sm:px-6 py-2.5 sm:py-3 text-amber-900/60 hover:text-amber-900 text-xs font-black uppercase transition-all"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={() => { handleCreateNote(); setIsNoteModalOpen(false); }}
                   disabled={!newNoteContent || isPending}
-                  className="px-8 py-3 bg-amber-950 hover:bg-black disabled:opacity-30 text-[#fef9c3] text-[11px] font-black uppercase rounded shadow-2xl active:scale-95 transition-all"
+                  className="px-6 sm:px-8 py-2.5 sm:py-3 bg-amber-950 hover:bg-black disabled:opacity-30 text-[#fef9c3] text-xs font-black uppercase rounded-lg shadow-xl active:scale-95 transition-all"
                 >
                   Pregar Nota
                 </button>

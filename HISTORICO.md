@@ -77,5 +77,42 @@ A base de dados será orquestrada via schema prisma:
     - **Documentação de Arquitetura:** Criado o plano detalhado e manual de identidade em `doc/icone-identidade-visual.md`.
 - **Benefício:** Padronização estética profissional e eliminação de designs secos sem ícones, proporcionando a experiência premium exigida pelo padrão visual moderno.
 
+## [2026-06-03] - Adaptação Completa para Responsividade Mobile (Touch-First UX)
+- **Status:** Concluído (Incremento Estável).
+- **Ações:**
+    - **Navegação Adaptativa (Mobile Switcher):** Implementado controle em abas (`xl:hidden`) para alternar fluidamente entre `[ 📋 Tarefas ]` e `[ 📝 Notas ]` no mobile, mantendo a visão de duas colunas intacta no desktop (`xl:flex`).
+    - **Eliminação de Dependência de Hover:** Botões de ação (editar, excluir, reordenar) tornados visíveis e acessíveis em dispositivos de toque (`opacity-100 lg:opacity-0 lg:group-hover:opacity-100`), com menu touch (`MoreVertical`) para projetos na sidebar.
+    - **Envio de Andamento Ergonômico:** Campo de andamentos refatorado com estado controlado e botão primário com ícone `Send` para submissão imediata por toque no smartphone, mantendo suporte ao `Enter` físico no desktop.
+    - **Ajuste de Viewport e Zoom iOS:** Adicionada diretiva `viewport` com escala controlada no `layout.tsx`, inputs padronizados para evitar o auto-zoom do Safari mobile e uso de `100dvh` para prevenção de quebras por barras de navegação do browser.
+    - **Otimização de Modais:** Modais de projeto, tarefa e notas reconfigurados com paddings responsivos (`p-3/p-5`), rotação de post-its desativada em telas estreitas e modal de detalhes em formato bottom-sheet móvel.
+- **Documentação Detalhada:** Criado o documento técnico em `doc/responsividade-mobile.md`.
+- **Benefício:** Acesso 100% funcional, fluído e confortável a partir de qualquer smartphone Android ou iPhone.
 
-
+## [2026-06-03] - Correção de Overflow Horizontal e Resolução de Issues no Next.js (Mobile Fix)
+- **Status:** Concluído (Incremento Estável).
+- **Problema Relatado:**
+    1. Overlay do Next.js acusando "2 Issues" no canto inferior esquerdo.
+    2. Tela cortando textos e botões na margem direita em visualização mobile, além do colapso do switcher mobile de Tarefas/Notas.
+- **Causa Raiz:**
+    1. **Issues do React Hooks no Next.js:**
+        - Variáveis de estado chamadas em evento `Escape` antes de suas declarações no escopo do componente (`react-hooks/immutability`).
+        - `useEffect` realizando sincronização síncrona de estado (`setSelectedTaskForDetail`) causando efeito cascata (`react-hooks/set-state-in-effect`).
+        - `useEffect` de tema/visualização chamando `setState` síncrono na montagem.
+    2. **Overflow e Corte de Texto no Mobile:**
+        - Tag `<main>` e containers flexíveis sem `min-w-0` e `w-full` forçavam expansão horizontal do layout além da largura física da tela (`100vw`).
+        - Switcher mobile utilizava `grid grid-cols-2` com colapso de coluna devido à largura extrapolada.
+        - Textos dos cards de tarefas sem `min-w-0` e `[overflow-wrap:anywhere]` empurravam os botões de ação para fora da tela.
+- **Ações Realizadas:**
+    - **Correção de Hidratação HTML (`<button>` inside `<button>`):**
+        - O container de cada projeto na sidebar era um `<button>` e abrigava o botão mobile `MoreVertical` dentro dele, violando a especificação do HTML e causando erro fatal de hidratação no React 19.
+        - Refatorado para container `<div>` com o botão de seleção do projeto à esquerda e o botão de menu à direita como elementos irmãos (siblings).
+    - **Reorganização de Estados & Hooks:**
+        - Todos os `useState` movidos para o início absoluto do componente `DashboardContent.tsx`.
+        - Substituído o estado redundante `selectedTaskForDetail` por derivação reativa pura via `useMemo` com base em `selectedTaskId` e `initialTasks`, eliminando totalmente o `useEffect` síncrono.
+        - Inicialização de tema/visualização envolvida em `startTransition`.
+        - Tipagem estrita de `initialNotes: Note[]` eliminando `any` e limpando imports não utilizados.
+    - **Contenção Estrita de Largura e Quebra de Texto:**
+        - Inclusão de `min-w-0 w-full max-w-full overflow-x-hidden` em `<main>`, header, colunas e cards.
+        - Switcher mobile refatorado para container flex com `flex-1` por botão, com `truncate` e badges responsivos.
+        - Textos dos cards e títulos configurados com `flex-1 min-w-0 break-words [overflow-wrap:anywhere]`.
+- **Benefício:** Zero erros no linter/Next.js Overlay (badge "2 Issues" e erro de hidratação eliminados) e interface 100% responsiva sem cortes.
