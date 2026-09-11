@@ -15,6 +15,9 @@
   --surface-hover: #2a2a2a;
   --border: #333333;
   --accent: #3b82f6;
+  --status-completed: #34d399;
+  --status-completed-bg: rgba(16, 185, 129, 0.15);
+  --status-completed-glow: rgba(16, 185, 129, 0.5);
 }
 
 :root.theme-light {
@@ -31,6 +34,10 @@
   /* Âmbar escuro para combinar com o caderno */
   --backdrop: rgba(60, 58, 48, 0.85);
   /* Backdrop sépia escuro */
+  --status-completed: #14532d;
+  /* Verde floresta profundo com contraste WCAG AAA sobre o papel sépia */
+  --status-completed-bg: rgba(20, 83, 45, 0.16);
+  --status-completed-glow: transparent;
 }
 
 .theme-light body {

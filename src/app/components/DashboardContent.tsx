@@ -5,10 +5,11 @@ import {
   CheckCircle2, Circle, Filter, Plus, LogOut,
   Trash2, Edit2, X, MessageSquare,
   ChevronUp, ChevronDown, Menu, Sun, Moon, Search, List, LayoutGrid,
-  FileText, FileCode, File, Download, Send, MoreVertical
+  FileText, FileCode, File, Download, Send, MoreVertical,
+  Settings, KeyRound, Eye, EyeOff, AlertCircle
 } from "lucide-react";
 
-import { logout } from "../actions/auth";
+import { logout, changePassword } from "../actions/auth";
 import { createProject, updateProject, deleteProject, reorderProjects } from "../actions/projects";
 import {
   createTask, createLog, updateTaskStatus,
@@ -133,6 +134,17 @@ export default function DashboardContent({
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [isPending, startTransition] = useTransition();
 
+  // Estados de Configurações e Troca de Senha
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [settingsSuccess, setSettingsSuccess] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
   // Derivado reativo da tarefa selecionada (evita cascading renders de useEffect)
   const selectedTaskForDetail = useMemo(() => {
     if (!selectedTaskId) return null;
@@ -148,6 +160,7 @@ export default function DashboardContent({
         setIsProjectModalOpen(false);
         setIsTaskModalOpen(false);
         setIsNoteModalOpen(false);
+        setIsSettingsModalOpen(false);
         setEditingProject(null);
         setEditingTask(null);
         setEditingNoteId(null);
@@ -157,6 +170,30 @@ export default function DashboardContent({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSettingsError(null);
+    setSettingsSuccess(null);
+    setIsChangingPassword(true);
+
+    try {
+      const res = await changePassword(currentPassword, newPassword, confirmPassword);
+      if (res.success) {
+        setSettingsSuccess(res.message || "Senha alterada com sucesso!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        setSettingsError(res.error || "Erro ao alterar a senha.");
+      }
+    } catch (err: any) {
+      setSettingsError("Erro de comunicação ao atualizar a senha.");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
 
   // Persistência de Tema e Visualização
   useEffect(() => {
@@ -616,6 +653,17 @@ export default function DashboardContent({
               <X size={20} />
             </button>
             <button
+              onClick={() => {
+                setSettingsError(null);
+                setSettingsSuccess(null);
+                setIsSettingsModalOpen(true);
+              }}
+              className="p-2 text-[#666666] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-md transition-all"
+              title="Configurações e Segurança"
+            >
+              <Settings size={18} />
+            </button>
+            <button
               onClick={handleLogout}
               disabled={isPending}
               className="p-2 text-[#666666] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-md transition-all disabled:opacity-50"
@@ -639,7 +687,9 @@ export default function DashboardContent({
                       ? "bg-[var(--surface-hover)] text-[var(--foreground)] shadow-lg"
                       : "text-[#888] hover:bg-[var(--surface-hover)]/40 hover:text-[var(--foreground)]"
                   )}
-                  style={selectedProjectId === project.id ? { borderLeft: `2px solid ${project.color}` } : {}}
+                  style={selectedProjectId === project.id ? { 
+                    borderLeft: `3px solid ${theme === 'light' ? 'var(--accent)' : project.color}` 
+                  } : {}}
                 >
                   <button
                     type="button"
@@ -647,10 +697,12 @@ export default function DashboardContent({
                     className="flex-1 min-w-0 flex items-center gap-3 px-3 py-2.5 text-left transition-colors"
                   >
                     <div
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all duration-500"
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-all duration-300"
                       style={{
-                        backgroundColor: project.color,
-                        boxShadow: selectedProjectId === project.id ? `0 0 12px ${project.color}` : `0 0 4px ${project.color}40`
+                        backgroundColor: theme === 'light' ? 'var(--accent)' : project.color,
+                        boxShadow: theme === 'light'
+                          ? (selectedProjectId === project.id ? '0 1px 3px rgba(0,0,0,0.2)' : 'none')
+                          : (selectedProjectId === project.id ? `0 0 12px ${project.color}` : `0 0 4px ${project.color}40`)
                       }}
                     />
                     <span className="font-bold text-sm truncate tracking-tight">{project.name}</span>
@@ -738,8 +790,8 @@ export default function DashboardContent({
                   </button>
                   <div className="flex items-center gap-2 min-w-0">
                     <div 
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: selectedProject.color }}
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors"
+                      style={{ backgroundColor: theme === 'light' ? 'var(--accent)' : selectedProject.color }}
                     />
                     <h2 className="text-base sm:text-lg lg:text-2xl font-bold text-[var(--foreground)] tracking-tight truncate max-w-[130px] xs:max-w-[190px] sm:max-w-none">
                       {selectedProject.name}
@@ -785,6 +837,17 @@ export default function DashboardContent({
                     title={theme === 'dark' ? "Mudar para tema claro" : "Mudar para tema escuro"}
                   >
                     {theme === 'dark' ? <Sun size={17} className="text-amber-400" /> : <Moon size={17} className="text-[var(--accent)]" />}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSettingsError(null);
+                      setSettingsSuccess(null);
+                      setIsSettingsModalOpen(true);
+                    }}
+                    className="p-2 sm:p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-all shadow-sm active:scale-95 group"
+                    title="Configurações e Segurança"
+                  >
+                    <Settings size={17} className="text-[#888] group-hover:text-[var(--foreground)] group-hover:rotate-45 transition-transform duration-300" />
                   </button>
                 </div>
               </div>
@@ -881,17 +944,24 @@ export default function DashboardContent({
                     onClick={() => setStatusFilter("completed")}
                     className={cn(
                       "pb-1 text-sm font-bold transition-all relative flex items-center gap-1.5",
-                      statusFilter === "completed" ? "text-emerald-400" : "text-[#666] hover:text-[#888]"
+                      statusFilter === "completed" ? "text-[var(--status-completed)]" : "text-[#666] hover:text-[#888]"
                     )}
                   >
                     <span>Concluídas</span>
                     <span className={cn(
                       "text-[10px] font-black px-1.5 py-0.5 rounded-md",
-                      statusFilter === "completed" ? "bg-emerald-500/15 text-emerald-400" : "bg-[var(--surface)] text-[#666]"
+                      statusFilter === "completed" ? "bg-[var(--status-completed-bg)] text-[var(--status-completed)]" : "bg-[var(--surface)] text-[#666]"
                     )}>
                       {initialTasks.filter(t => t.status === "completed").length}
                     </span>
-                    {statusFilter === "completed" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />}
+                    {statusFilter === "completed" && (
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--status-completed)]"
+                        style={{
+                          boxShadow: theme === 'dark' ? '0 0 10px var(--status-completed-glow)' : 'none'
+                        }}
+                      />
+                    )}
                   </button>
                 </div>
 
@@ -1006,7 +1076,7 @@ export default function DashboardContent({
                               {/* Efeito de brilho no hover */}
                               <div
                                 className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none"
-                                style={{ background: `radial-gradient(circle at center, ${selectedProject.color}, transparent 70%)` }}
+                                style={{ background: `radial-gradient(circle at center, ${theme === 'light' ? 'var(--accent)' : selectedProject.color}, transparent 70%)` }}
                               />
                               <div className={cn("flex items-start w-full min-w-0", viewMode === 'list' ? "gap-2.5 sm:gap-3" : "gap-3 sm:gap-4")}>
                                 <button
@@ -1303,7 +1373,7 @@ export default function DashboardContent({
                   onClick={() => { handleToggleTask(selectedTaskForDetail); setSelectedTaskId(null); }}
                   className={cn(
                     "px-2.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold rounded-lg flex items-center gap-1.5 transition-all",
-                    selectedTaskForDetail.status === "completed" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-[var(--accent)] text-[var(--background)] shadow-md"
+                    selectedTaskForDetail.status === "completed" ? "bg-[var(--status-completed-bg)] text-[var(--status-completed)] border border-[var(--status-completed)]/30" : "bg-[var(--accent)] text-[var(--background)] shadow-md"
                   )}
                 >
                   <CheckCircle2 size={15} /> <span className="hidden sm:inline">{selectedTaskForDetail.status === "completed" ? "Reabrir" : "Concluir"}</span>
@@ -1703,6 +1773,129 @@ export default function DashboardContent({
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIGURAÇÕES E SEGURANÇA (TROCA DE SENHA) */}
+      {isSettingsModalOpen && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-3 sm:p-4">
+          <div 
+            className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Cabeçalho do Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-[var(--border)]/60 mb-5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)]">
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-[var(--foreground)] tracking-tight">Configurações da Conta</h3>
+                  <p className="text-[11px] text-[#777]">Segurança e credenciais de acesso</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSettingsModalOpen(false)}
+                className="p-1.5 text-[#777] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-xl transition-all"
+                title="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Formulário de Troca de Senha */}
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[var(--accent)] mb-2">
+                <KeyRound size={14} />
+                <span>Alterar Senha de Acesso</span>
+              </div>
+
+              {settingsError && (
+                <div className="p-3 bg-red-500/15 border border-red-500/30 rounded-xl flex items-center gap-2.5 text-xs text-red-400">
+                  <AlertCircle size={16} className="flex-shrink-0" />
+                  <span>{settingsError}</span>
+                </div>
+              )}
+
+              {settingsSuccess && (
+                <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl flex items-center gap-2.5 text-xs text-emerald-400">
+                  <CheckCircle2 size={16} className="flex-shrink-0" />
+                  <span>{settingsSuccess}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-[#888] mb-1">Senha Atual</label>
+                <div className="relative">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    required
+                    placeholder="Sua senha atual..."
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 pr-10 outline-none focus:border-[var(--accent)] text-sm transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[var(--foreground)] transition-colors"
+                  >
+                    {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#888] mb-1">Nova Senha</label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    required
+                    placeholder="Mínimo de 4 caracteres..."
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 pr-10 outline-none focus:border-[var(--accent)] text-sm transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] hover:text-[var(--foreground)] transition-colors"
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#888] mb-1">Confirmar Nova Senha</label>
+                <input
+                  type={showNewPassword ? "text" : "password"}
+                  required
+                  placeholder="Repita a nova senha..."
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-3.5 py-2.5 outline-none focus:border-[var(--accent)] text-sm transition-all"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsModalOpen(false)}
+                  className="flex-1 py-2.5 bg-[var(--surface-hover)] hover:bg-[var(--border)]/40 text-xs sm:text-sm rounded-xl transition-all font-medium text-[var(--foreground)]"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="flex-1 py-2.5 bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 text-[var(--background)] text-xs sm:text-sm rounded-xl transition-all font-bold shadow-md active:scale-95"
+                >
+                  {isChangingPassword ? "Atualizando..." : "Salvar Senha"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

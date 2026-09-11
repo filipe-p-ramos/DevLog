@@ -30,7 +30,7 @@ Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
 
 ## 📄 Documentação
 Para detalhes sobre decisões técnicas, arquitetura e evolução do projeto, consulte:
-- [HISTORICO.md](./HISTORICO.md) — Diário cronológico de arquitetura e entregas (Marcos 01 a 06).
+- [HISTORICO.md](./HISTORICO.md) — Diário cronológico de arquitetura e entregas (Marcos 01 a 08).
 - Pasta [doc/](./doc/) — Memoriais técnicos sequenciais e detalhados de cada marco.
 
 

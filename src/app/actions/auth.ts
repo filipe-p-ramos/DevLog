@@ -77,3 +77,52 @@ export async function getUserId() {
   
   return user.id;
 }
+
+export async function changePassword(currentPassword: string, newPassword: string, confirmPassword: string) {
+  try {
+    const userId = await getUserId();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return { success: false, error: "Preencha todos os campos obrigatórios." };
+    }
+
+    if (newPassword !== confirmPassword) {
+      return { success: false, error: "A nova senha e a confirmação não coincidem." };
+    }
+
+    if (newPassword.length < 4) {
+      return { success: false, error: "A nova senha deve ter no mínimo 4 caracteres." };
+    }
+
+    // Buscar usuário e hash atual
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, password: true }
+    });
+
+    if (!user || !user.password) {
+      return { success: false, error: "Usuário não encontrado." };
+    }
+
+    // Validar senha atual com bcrypt resistente a timing attacks
+    const isCurrentValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentValid) {
+      return { success: false, error: "A senha atual informada está incorreta." };
+    }
+
+    // Gerar novo hash com salt fator 10
+    const salt = await bcrypt.genSalt(10);
+    const newHash = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: newHash }
+    });
+
+    return { success: true, message: "Senha alterada com sucesso!" };
+  } catch (error) {
+    console.error("Erro ao alterar senha:", error);
+    return { success: false, error: "Ocorreu um erro interno ao processar a solicitação." };
+  }
+}
+

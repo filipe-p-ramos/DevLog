@@ -140,6 +140,29 @@ A base de dados será orquestrada via schema prisma:
   - **Filtro Contextual e Contadores Dinâmicos (Frontend):** Atualizado `DashboardContent.tsx` para derivar as tags exibidas a partir das tarefas do status atualmente ativo (`pending` vs `completed`). Tags com 0 tarefas no status ativo não são exibidas. Cada botão exibe agora um badge com a contagem exata de tarefas (ex: `MELHORIA DE UX (4)`). Adicionado botão de remoção rápida com confirmação no hover de cada tag e auto-reset da seleção ao alternar de aba.
 - **Documentação Relacionada:** [doc/06_expulgo_tags_orfas_filtro_contextual.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/06_expulgo_tags_orfas_filtro_contextual.md)
 
+---
+
+### [2026-09-11] - Marco 07: Ajuste de Contraste no Tema Claro e Módulo de Troca de Senha
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Correção do contraste insatisfatório da aba "Concluídas" no tema claro sépia (onde o verde fluorescente apresentava legibilidade insuficiente) e implementação de módulo de configurações para troca de senha segura pelo usuário logado.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Design Tokens Semânticos no CSS:** Introduzidos tokens adaptativos `--status-completed` e `--status-completed-bg` em `src/app/globals.css`. No tema claro sépia, adotado o tom verde floresta profundo (`#14532d`), garantindo alto contraste e conformidade com os padrões WCAG AAA. No tema escuro, preservado o verde esmeralda vibrante com brilho neon suave.
+  - **Cibersegurança e Hashing (Server Action):** Desenvolvida a ação `changePassword` em `src/app/actions/auth.ts`, exigindo e validando a senha atual com `bcrypt.compare` (mitigação contra timing attacks e sequestro de sessão), validação de tamanho mínimo e geração de novo hash com salt fator 10.
+  - **Pontos de Acesso na Interface (UX):** Adicionado botão de engrenagem (`Settings`) no Header principal (ao lado do alternador de tema) e na Sidebar (ao lado do botão de logout), proporcionando acesso intuitivo tanto no desktop quanto em dispositivos móveis.
+  - **Modal de Configurações da Conta:** Implementado modal moderno com alternador de visibilidade de senha (`Eye` / `EyeOff`), validações reativas e feedback claro de erro e sucesso.
+- **Documentação Relacionada:** [doc/07_ajuste_contraste_tema_claro_e_troca_de_senha.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/07_ajuste_contraste_tema_claro_e_troca_de_senha.md)
+
+---
+
+### [2026-09-11] - Marco 08: Harmonização Cromática dos Projetos no Tema Claro
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Eliminação de marcadores, bordas ativas e luzes azuis elétricas na barra lateral e no cabeçalho do projeto quando no tema claro sépia/caderno, unificando a identidade visual sob a paleta clássica e terrosa de cera e pergaminho.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Adaptação Dinâmica na Sidebar:** No componente `DashboardContent.tsx`, o ponto circular (`backgroundColor`), a borda esquerda do item ativo (`borderLeft`) e a sombra (`boxShadow`) foram condicionados para utilizar `var(--accent)` (tom âmbar quente/caramelo `#b45309`) e sombra suave analógica quando `theme === 'light'`, preservando o azul elétrico `#3b82f6` e seu efeito neon glow exclusivamente no tema escuro.
+  - **Adaptação do Cabeçalho Principal:** O marcador circular ao lado do título do projeto ativo no header agora também herda dinamicamente `var(--accent)` no modo claro.
+  - **Gradiente de Hover nos Cards:** O brilho radial de hover nas tarefas foi harmonizado para utilizar `var(--accent)` no tema claro.
+- **Documentação Relacionada:** [doc/08_harmonizacao_cores_projetos_tema_claro.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/08_harmonizacao_cores_projetos_tema_claro.md)
+
+
+
 
 
 
