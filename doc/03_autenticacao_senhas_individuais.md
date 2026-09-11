@@ -1,4 +1,4 @@
-# Memorial Técnico — 01: Autenticação Segura com Senhas Individuais e Purga de Dados
+# Memorial Técnico — 03: Autenticação Segura com Senhas Individuais e Purga de Dados
 
 ## 1. Motivação e Contexto Operacional
 Anteriormente, o sistema de autenticação operava sob um modelo de **Segredo Compartilhado (*Shared Secret*)**:

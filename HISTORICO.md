@@ -64,62 +64,36 @@ A base de dados será orquestrada via schema prisma:
     - Modificado `getTasks` e `getNotes` para utilizar `orderBy: { updatedAt: "desc" }`.
     - Atualizadas as actions de `Log` (`createLog`, `updateLog`, `deleteLog`) para forçar a atualização do campo `updatedAt` na tarefa pai via Prisma, garantindo que qualquer interação com andamentos mova a tarefa para o topo da lista.
 
-## [2026-05-29] - Nova Identidade Visual e Favicon Dinâmico (DevLog)
-- **Status:** Concluído (Incremento Estável).
-- **Ações:**
-    - **Criação de Logo Proprietário (Tech/Dev Theme):** Gerado um logotipo sob medida focado em desenvolvimento e rastreamento de tarefas (símbolos de chaves de código e checklist minimalista) em tons de azul escuro, ciano e cinza grafite.
-    - **Estruturação de Pastas & Assets:**
-        - Criado o diretório estático `public/` (inexistente no boilerplate inicial) para hospedar `logo-devlog.png` ($1024 \times 1024$px com zoom máximo e apenas 5% de margem útil para máxima visibilidade e legibilidade).
-        - Copiado o asset para `src/app/icon.png` habilitando o roteador de favicons automáticos do Next.js App Router.
-    - **Integração Visual Estrita:**
-        - **Sidebar Header** (`DashboardContent.tsx`): Integrada a imagem do novo logotipo em um container arredondado de bordas finas com transição suave de escala em `hover` ao lado do título principal "Project Notes".
-        - **Tela de Login** (`login/page.tsx`): Substituído o ícone de cadeado genérico (`LockKeyhole`) pelo logotipo oficial centralizado na tela de acesso, trazendo consistência visual desde o primeiro instante de acesso.
-    - **Documentação de Arquitetura:** Criado o plano detalhado e manual de identidade em `doc/icone-identidade-visual.md`.
-- **Benefício:** Padronização estética profissional e eliminação de designs secos sem ícones, proporcionando a experiência premium exigida pelo padrão visual moderno.
+---
 
-## [2026-06-03] - Adaptação Completa para Responsividade Mobile (Touch-First UX)
-- **Status:** Concluído (Incremento Estável).
-- **Ações:**
-    - **Navegação Adaptativa (Mobile Switcher):** Implementado controle em abas (`xl:hidden`) para alternar fluidamente entre `[ 📋 Tarefas ]` e `[ 📝 Notas ]` no mobile, mantendo a visão de duas colunas intacta no desktop (`xl:flex`).
-    - **Eliminação de Dependência de Hover:** Botões de ação (editar, excluir, reordenar) tornados visíveis e acessíveis em dispositivos de toque (`opacity-100 lg:opacity-0 lg:group-hover:opacity-100`), com menu touch (`MoreVertical`) para projetos na sidebar.
-    - **Envio de Andamento Ergonômico:** Campo de andamentos refatorado com estado controlado e botão primário com ícone `Send` para submissão imediata por toque no smartphone, mantendo suporte ao `Enter` físico no desktop.
-    - **Ajuste de Viewport e Zoom iOS:** Adicionada diretiva `viewport` com escala controlada no `layout.tsx`, inputs padronizados para evitar o auto-zoom do Safari mobile e uso de `100dvh` para prevenção de quebras por barras de navegação do browser.
-    - **Otimização de Modais:** Modais de projeto, tarefa e notas reconfigurados com paddings responsivos (`p-3/p-5`), rotação de post-its desativada em telas estreitas e modal de detalhes em formato bottom-sheet móvel.
-- **Documentação Detalhada:** Criado o documento técnico em `doc/responsividade-mobile.md`.
-- **Benefício:** Acesso 100% funcional, fluído e confortável a partir de qualquer smartphone Android ou iPhone.
-
-## [2026-06-03] - Correção de Overflow Horizontal e Resolução de Issues no Next.js (Mobile Fix)
-- **Status:** Concluído (Incremento Estável).
-- **Problema Relatado:**
-    1. Overlay do Next.js acusando "2 Issues" no canto inferior esquerdo.
-    2. Tela cortando textos e botões na margem direita em visualização mobile, além do colapso do switcher mobile de Tarefas/Notas.
-- **Causa Raiz:**
-    1. **Issues do React Hooks no Next.js:**
-        - Variáveis de estado chamadas em evento `Escape` antes de suas declarações no escopo do componente (`react-hooks/immutability`).
-        - `useEffect` realizando sincronização síncrona de estado (`setSelectedTaskForDetail`) causando efeito cascata (`react-hooks/set-state-in-effect`).
-        - `useEffect` de tema/visualização chamando `setState` síncrono na montagem.
-    2. **Overflow e Corte de Texto no Mobile:**
-        - Tag `<main>` e containers flexíveis sem `min-w-0` e `w-full` forçavam expansão horizontal do layout além da largura física da tela (`100vw`).
-        - Switcher mobile utilizava `grid grid-cols-2` com colapso de coluna devido à largura extrapolada.
-        - Textos dos cards de tarefas sem `min-w-0` e `[overflow-wrap:anywhere]` empurravam os botões de ação para fora da tela.
-- **Ações Realizadas:**
-    - **Correção de Hidratação HTML (`<button>` inside `<button>`):**
-        - O container de cada projeto na sidebar era um `<button>` e abrigava o botão mobile `MoreVertical` dentro dele, violando a especificação do HTML e causando erro fatal de hidratação no React 19.
-        - Refatorado para container `<div>` com o botão de seleção do projeto à esquerda e o botão de menu à direita como elementos irmãos (siblings).
-    - **Reorganização de Estados & Hooks:**
-        - Todos os `useState` movidos para o início absoluto do componente `DashboardContent.tsx`.
-        - Substituído o estado redundante `selectedTaskForDetail` por derivação reativa pura via `useMemo` com base em `selectedTaskId` e `initialTasks`, eliminando totalmente o `useEffect` síncrono.
-        - Inicialização de tema/visualização envolvida em `startTransition`.
-        - Tipagem estrita de `initialNotes: Note[]` eliminando `any` e limpando imports não utilizados.
-    - **Contenção Estrita de Largura e Quebra de Texto:**
-        - Inclusão de `min-w-0 w-full max-w-full overflow-x-hidden` em `<main>`, header, colunas e cards.
-        - Switcher mobile refatorado para container flex com `flex-1` por botão, com `truncate` e badges responsivos.
-        - Textos dos cards e títulos configurados com `flex-1 min-w-0 break-words [overflow-wrap:anywhere]`.
-- **Benefício:** Zero erros no linter/Next.js Overlay (badge "2 Issues" e erro de hidratação eliminados) e interface 100% responsiva sem cortes.
+### [2026-05-29] - Marco 01: Nova Identidade Visual e Favicon Dinâmico (DevLog)
+- **Status / Objetivo / Motivação:** Concluído (Incremento Estável). Padronização estética profissional e eliminação de designs secos sem ícones, proporcionando a experiência premium exigida pelo padrão visual moderno.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Criação de Logo Proprietário (Tech/Dev Theme):** Gerado um logotipo sob medida focado em desenvolvimento e rastreamento de tarefas (símbolos de chaves de código e checklist minimalista) em tons de azul escuro, ciano e cinza grafite.
+  - **Estruturação de Pastas & Assets:**
+    - Criado o diretório estático `public/` (inexistente no boilerplate inicial) para hospedar `logo-devlog.png` ($1024 \times 1024$px com zoom máximo e apenas 5% de margem útil para máxima visibilidade e legibilidade).
+    - Copiado o asset para `src/app/icon.png` habilitando o roteador de favicons automáticos do Next.js App Router.
+  - **Integração Visual Estrita:**
+    - **Sidebar Header** (`DashboardContent.tsx`): Integrada a imagem do novo logotipo em um container arredondado de bordas finas com transição suave de escala em `hover` ao lado do título principal "Project Notes".
+    - **Tela de Login** (`login/page.tsx`): Substituído o ícone de cadeado genérico (`LockKeyhole`) pelo logotipo oficial centralizado na tela de acesso, trazendo consistência visual desde o primeiro instante de acesso.
+- **Documentação Relacionada:** [doc/01_icone_identidade_visual.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/01_icone_identidade_visual.md)
 
 ---
 
-### [2026-09-11] - Marco 01: Autenticação Segura com Senhas Individuais e Purga de Dados
+### [2026-06-03] - Marco 02: Adaptação Completa para Responsividade Mobile (Touch-First UX)
+- **Status / Objetivo / Motivação:** Concluído (Incremento Estável). Acesso 100% funcional, fluído e confortável a partir de qualquer smartphone Android ou iPhone sem comprometer o layout desktop.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Navegação Adaptativa (Mobile Switcher):** Implementado controle em abas (`xl:hidden`) para alternar fluidamente entre `[ 📋 Tarefas ]` e `[ 📝 Notas ]` no mobile, mantendo a visão de duas colunas intacta no desktop (`xl:flex`).
+  - **Eliminação de Dependência de Hover:** Botões de ação (editar, excluir, reordenar) tornados visíveis e acessíveis em dispositivos de toque (`opacity-100 lg:opacity-0 lg:group-hover:opacity-100`), com menu touch (`MoreVertical`) para projetos na sidebar.
+  - **Envio de Andamento Ergonômico:** Campo de andamentos refatorado com estado controlado e botão primário com ícone `Send` para submissão imediata por toque no smartphone, mantendo suporte ao `Enter` físico no desktop.
+  - **Ajuste de Viewport e Zoom iOS:** Adicionada diretiva `viewport` com escala controlada no `layout.tsx`, inputs padronizados para evitar o auto-zoom do Safari mobile e uso de `100dvh` para prevenção de quebras por barras de navegação do browser.
+  - **Otimização de Modais:** Modais de projeto, tarefa e notas reconfigurados com paddings responsivos (`p-3/p-5`), rotação de post-its desativada em telas estreitas e modal de detalhes em formato bottom-sheet móvel.
+  - **Contenção Estrita de Largura e Quebra de Texto:** Inclusão de `min-w-0 w-full max-w-full overflow-x-hidden` e eliminação de warnings de renderização no React/Next.js.
+- **Documentação Relacionada:** [doc/02_responsividade_mobile.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/02_responsividade_mobile.md)
+
+---
+
+### [2026-09-11] - Marco 03: Autenticação Segura com Senhas Individuais e Purga de Dados
 - **Status / Objetivo / Motivação:** Concluído com sucesso. Eliminação da autenticação vulnerável baseada em senha global estática no `.env` (`APP_PASSWORD`) e fallback hardcoded `"123"`. Implementação de senhas individuais por usuário com hash criptográfico `bcrypt`, mantendo a aplicação estritamente privada (projeto pessoal fechado, sem telas de cadastro público) e realizando a purga definitiva de dados obsoletos.
 - **Decisões Técnicas / Ações Realizadas:**
   - **Cibersegurança (Bcrypt & Salt):** Integração de `bcryptjs` para geração e comparação de hashes com salt rounds de fator 10.
@@ -129,5 +103,6 @@ A base de dados será orquestrada via schema prisma:
   - **Preservação de Dados:** Dados do usuário `filipe` preservados com 100% de integridade (6 projetos, 71 tarefas, notas e tags intactas).
   - **Operação & CLI:** Criação do script administrativo `node scripts/set-password.js <usuario> <senha>` e atalho `npm run user:password`.
   - **Variáveis de Ambiente:** Remoção da variável vulnerável `APP_PASSWORD` de `.env` e `config.env`.
-- **Documentação Relacionada:** [doc/01_autenticacao_senhas_individuais.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/01_autenticacao_senhas_individuais.md)
+- **Documentação Relacionada:** [doc/03_autenticacao_senhas_individuais.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/03_autenticacao_senhas_individuais.md)
+
 

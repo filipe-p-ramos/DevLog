@@ -1,4 +1,4 @@
-# Documentação Técnica: Adaptação de Responsividade Mobile (Touch-First UX)
+# Memorial Técnico — 02: Adaptação de Responsividade Mobile (Touch-First UX)
 
 ## 1. Visão Geral
 Esta atualização transformou o **Project Notes** em uma aplicação totalmente responsiva e ergonômica para dispositivos móveis (smartphones Android e iPhones/iOS), sem degradar ou alterar a experiência do usuário no desktop.
@@ -31,9 +31,9 @@ Esta atualização transformou o **Project Notes** em uma aplicação totalmente
 ### 2.4. Viewport e Prevenção do Zoom Automático no iOS
 - **Cenário Anterior:** Falta de configuração explícita de `viewport` no `layout.tsx` e campos de entrada de texto com tamanhos menores que 16px (`text-xs` / `text-sm`), fazendo com que o Safari no iPhone desse zoom involuntário a cada toque no campo.
 - **Solução Implementada:**
-  - Exportação da constante `viewport: Viewport` no [src/app/layout.tsx](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/src/app/layout.tsx) com `width: "device-width", initialScale: 1, maximumScale: 5`.
+  - Exportação da constante `viewport: Viewport` no [`src/app/layout.tsx`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/src/app/layout.tsx) com `width: "device-width", initialScale: 1, maximumScale: 5`.
   - Adequação dos inputs e textareas para `text-base sm:text-sm` em todos os modais.
-  - Adição de `-webkit-tap-highlight-color: transparent` e `touch-action: manipulation` no [src/app/globals.css](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/src/app/globals.css) para respostas imediatas ao toque.
+  - Adição de `-webkit-tap-highlight-color: transparent` e `touch-action: manipulation` no [`src/app/globals.css`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/src/app/globals.css) para respostas imediatas ao toque.
 
 ### 2.5. Modais e Efeitos Visuais
 - **Cenário Anterior:** O modal de notas amarelas possuía rotação CSS (`-rotate-1`), espaçamento fixo de 40px no topo e `p-10`, cortando o conteúdo em telas estreitas de smartphones.
@@ -56,7 +56,7 @@ Esta atualização transformou o **Project Notes** em uma aplicação totalmente
 ---
 
 ## 3. Arquivos Modificados
-- [src/app/layout.tsx](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/src/app/layout.tsx): Inclusão da diretiva `viewport`.
-- [src/app/globals.css](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/src/app/globals.css): Otimização de toques e tap-highlight.
-- [src/app/components/DashboardContent.tsx](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/src/app/components/DashboardContent.tsx): Refatoração completa de layout, header, colunas, switcher mobile, contenção de largura, eliminação de warnings de hooks e modais touch-friendly.
-- [HISTORICO.md](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/HISTORICO.md): Registro da evolução e arquitetura.
+- [`src/app/layout.tsx`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/src/app/layout.tsx): Inclusão da diretiva `viewport`.
+- [`src/app/globals.css`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/src/app/globals.css): Otimização de toques e tap-highlight.
+- [`src/app/components/DashboardContent.tsx`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/src/app/components/DashboardContent.tsx): Refatoração completa de layout, header, colunas, switcher mobile, contenção de largura, eliminação de warnings de hooks e modais touch-friendly.
+- [`HISTORICO.md`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/HISTORICO.md): Registro da evolução e arquitetura.

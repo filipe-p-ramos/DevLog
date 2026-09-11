@@ -1,4 +1,4 @@
-# Manual Técnico: Nova Identidade Visual e Favicon do DevLog (Project Notes)
+# Memorial Técnico — 01: Nova Identidade Visual e Favicon do DevLog (Project Notes)
 
 Este manual documenta a especificação técnica, a concepção estética e as integrações estruturais da nova identidade visual (Logotipo e Favicon) implementada no ecossistema **DevLog (Project Notes)**.
 
@@ -17,8 +17,8 @@ A plataforma **DevLog / Project Notes** é um dashboard para desenvolvedores doc
 
 | Caminho no Projeto | Formato | Dimensões | Escopo de Uso |
 | :--- | :--- | :--- | :--- |
-| [`/public/logo-devlog.png`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/PROJECT_NOTES/public/logo-devlog.png) | PNG (RGB) | $1024 \times 1024$ | Embutido diretamente no cabeçalho da barra lateral de navegação (Sidebar). |
-| [`/src/app/icon.png`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/PROJECT_NOTES/src/app/icon.png) | PNG (RGB) | $1024 \times 1024$ | Favicon dinâmico capturado automaticamente pelo Next.js App Router. |
+| [`/public/logo-devlog.png`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/public/logo-devlog.png) | PNG (RGB) | $1024 \times 1024$ | Embutido diretamente no cabeçalho da barra lateral de navegação (Sidebar). |
+| [`/src/app/icon.png`](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/src/app/icon.png) | PNG (RGB) | $1024 \times 1024$ | Favicon dinâmico capturado automaticamente pelo Next.js App Router. |
 
 ---
 
