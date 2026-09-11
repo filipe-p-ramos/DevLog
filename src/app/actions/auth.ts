@@ -3,25 +3,31 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 
 export async function loginWithPassword(formData: FormData) {
-  const username = formData.get("username") as string;
+  const username = (formData.get("username") as string)?.trim();
   const password = formData.get("password") as string;
-  const envPassword = process.env.APP_PASSWORD || "123";
 
-  // Por enquanto, todos os usuários usam a mesma senha global definida no .env
-  if (password !== envPassword) {
-    return { error: "Senha incorreta" };
+  if (!username || !password) {
+    return { error: "Credenciais inválidas" };
   }
 
-  // Verificar se o usuário existe no banco (usamos o campo email como username)
+  // Buscar o usuário no banco pelo username/email
   const user = await prisma.user.findUnique({
     where: { email: username.toLowerCase() },
   });
 
-  if (!user) {
-    return { error: "Usuário não encontrado" };
+  // Se o usuário não existir ou não possuir hash configurado, rejeitar
+  if (!user || !user.password) {
+    return { error: "Credenciais inválidas" };
+  }
+
+  // Comparação criptográfica segura com bcrypt (resistente a timing attacks)
+  const isPasswordValid = await bcrypt.compare(password, user.password);
+  if (!isPasswordValid) {
+    return { error: "Credenciais inválidas" };
   }
 
   const cookieStore = await cookies();

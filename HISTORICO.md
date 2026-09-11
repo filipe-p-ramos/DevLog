@@ -116,3 +116,18 @@ A base de dados será orquestrada via schema prisma:
         - Switcher mobile refatorado para container flex com `flex-1` por botão, com `truncate` e badges responsivos.
         - Textos dos cards e títulos configurados com `flex-1 min-w-0 break-words [overflow-wrap:anywhere]`.
 - **Benefício:** Zero erros no linter/Next.js Overlay (badge "2 Issues" e erro de hidratação eliminados) e interface 100% responsiva sem cortes.
+
+---
+
+### [2026-09-11] - Marco 01: Autenticação Segura com Senhas Individuais e Purga de Dados
+- **Status / Objetivo / Motivação:** Concluído com sucesso. Eliminação da autenticação vulnerável baseada em senha global estática no `.env` (`APP_PASSWORD`) e fallback hardcoded `"123"`. Implementação de senhas individuais por usuário com hash criptográfico `bcrypt`, mantendo a aplicação estritamente privada (projeto pessoal fechado, sem telas de cadastro público) e realizando a purga definitiva de dados obsoletos.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Cibersegurança (Bcrypt & Salt):** Integração de `bcryptjs` para geração e comparação de hashes com salt rounds de fator 10.
+  - **OWASP Compliance:** Server Action `loginWithPassword` padronizada com retorno de erro uniforme `"Credenciais inválidas"` para mitigar enumeração de contas (*User Enumeration*).
+  - **Banco de Dados (Prisma & Supabase):** Adicionado campo `password` ao model `User` e configuração de `onDelete: Cascade` nas relações `User -> Project` e `User -> TagConfig`.
+  - **Purga de Dados:** Remoção completa e irreversível do usuário `raphael` e todos os seus registros atrelados (1 projeto, 3 tarefas, 2 notas, tags), além do usuário residual `user@projectnotes.local`.
+  - **Preservação de Dados:** Dados do usuário `filipe` preservados com 100% de integridade (6 projetos, 71 tarefas, notas e tags intactas).
+  - **Operação & CLI:** Criação do script administrativo `node scripts/set-password.js <usuario> <senha>` e atalho `npm run user:password`.
+  - **Variáveis de Ambiente:** Remoção da variável vulnerável `APP_PASSWORD` de `.env` e `config.env`.
+- **Documentação Relacionada:** [doc/01_autenticacao_senhas_individuais.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/01_autenticacao_senhas_individuais.md)
+

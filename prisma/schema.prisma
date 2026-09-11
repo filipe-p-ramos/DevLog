@@ -11,6 +11,7 @@ datasource db {
 model User {
   id        String      @id @default(uuid())
   email     String      @unique
+  password  String      @default("")
   projects  Project[]
   tagConfigs TagConfig[]
   createdAt DateTime    @default(now())
@@ -22,7 +23,7 @@ model Project {
   color     String   @default("#000000") // Identificador visual
   status    String   @default("active")  // active, archived
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tasks     Task[]
   notes     Note[]
   order     Int      @default(0)
@@ -65,7 +66,7 @@ model TagConfig {
   name    String
   color   String
   userId  String
-  user    User   @relation(fields: [userId], references: [id])
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, name])
 }
