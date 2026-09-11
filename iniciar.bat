@@ -1,7 +1,7 @@
 @echo off
-TITLE PROJECT_NOTES - Desenvolvimento
+TITLE DevLog - Desenvolvimento
 echo ==================================================
-echo   Iniciando Ambiente de Desenvolvimento: PROJECT_NOTES
+echo   Iniciando Ambiente de Desenvolvimento: DevLog
 echo ==================================================
 echo.
 echo [!] Verificando dependencias...

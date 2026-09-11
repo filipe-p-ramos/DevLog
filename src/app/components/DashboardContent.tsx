@@ -640,7 +640,7 @@ export default function DashboardContent({
               />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)]">Project Notes</h1>
+              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)]">DevLog</h1>
               <p className="text-xs sm:text-sm text-[#888888] mt-0.5 font-medium">seus projetos em foco</p>
             </div>
           </button>
@@ -1280,7 +1280,7 @@ export default function DashboardContent({
               >
                 <Menu size={24} />
               </button>
-              <h1 className="ml-4 text-lg font-bold text-[var(--foreground)] tracking-tight">Project Notes</h1>
+              <h1 className="ml-4 text-lg font-bold text-[var(--foreground)] tracking-tight">DevLog</h1>
             </header>
             <div className="flex-1 flex items-center justify-center bg-[var(--background)] p-4 sm:p-8">
             <div className="max-w-md w-full text-center space-y-6 sm:space-y-8 animate-in fade-in zoom-in duration-500">
@@ -1291,7 +1291,7 @@ export default function DashboardContent({
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] mb-2 sm:mb-3 tracking-tight">Project Notes</h2>
+                <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] mb-2 sm:mb-3 tracking-tight">DevLog</h2>
                 <p className="text-xs sm:text-sm text-[#888] font-medium leading-relaxed">
                   Bem-vindo de volta! Selecione um projeto na barra lateral para gerenciar suas tarefas e notas, ou crie um novo workspace.
                 </p>

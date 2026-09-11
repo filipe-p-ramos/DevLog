@@ -21,7 +21,7 @@ export default function LoginPage() {
               className="w-full h-full object-cover"
             />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Project Notes</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white mb-2">DevLog</h1>
           <p className="text-[#888888]">Acesso restrito. Insira a senha do sistema.</p>
         </div>
 

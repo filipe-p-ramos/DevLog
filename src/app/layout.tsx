@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Project Notes - Seus projetos em foco",
-  description: "Anotações do desenvolvimento de projetos e tracking de etapas.",
+  title: "DevLog - Seus projetos em foco",
+  description: "Diário de bordo de desenvolvimento, registro de decisões arquiteturais e tracking de tarefas.",
 };
 
 export const viewport: Viewport = {

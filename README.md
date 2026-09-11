@@ -1,6 +1,12 @@
-# DevLog - Project Notes Dashboard
+# DevLog — Diário de Bordo & Gestão de Projetos
 
-O **DevLog** é uma aplicação web robusta projetada para o rastreio e acompanhamento de tarefas e anotações técnicas, focada em desenvolvedores que precisam documentar decisões arquiteturais, impedimentos e progressos.
+> Plataforma de rastreio de tarefas, notas técnicas e diário de bordo para desenvolvedores.
+
+## 📌 Sobre o Projeto
+
+O **DevLog** foi concebido para centralizar o fluxo de trabalho de engenharia de software em um único lugar: acompanhamento de tarefas (*issues/kanban*), registro de decisões arquiteturais (*Architecture Decision Records - ADRs*), bloqueios técnicos e documentação contínua de evolução.
+
+Diferente de gerenciadores de tarefas genéricos, o foco é a **alta densidade de informação e ergonomia para o desenvolvedor**, permitindo alternar fluidamente entre modos de exibição (Card detalhado vs. Lista compacta), filtragem contextual por tags e auditoria de alterações.
 
 ## 🚀 Como Iniciar
 
@@ -30,7 +36,7 @@ Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
 
 ## 📄 Documentação
 Para detalhes sobre decisões técnicas, arquitetura e evolução do projeto, consulte:
-- [HISTORICO.md](./HISTORICO.md) — Diário cronológico de arquitetura e entregas (Marcos 01 a 08).
+- [HISTORICO.md](./HISTORICO.md) — Diário cronológico de arquitetura e entregas (Marcos 01 a 09).
 - Pasta [doc/](./doc/) — Memoriais técnicos sequenciais e detalhados de cada marco.
 
 

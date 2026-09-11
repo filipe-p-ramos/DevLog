@@ -36,7 +36,7 @@ A base de dados será orquestrada via schema prisma:
 - [x] Implementação de Busca por Palavras-Chave (Título, Descrição e Logs)
 
 ---
-## Histórico de Evolução - Project Notes
+## Histórico de Evolução - DevLog
 
 ## [2026-04-25] - Correção de Build (Vercel)
 - **Correção de Tipagem (TypeScript):** Resolvido erro de compilação no Vercel onde a propriedade `title` estava sendo passada diretamente para o componente `Plus` da Lucide React.
@@ -160,6 +160,19 @@ A base de dados será orquestrada via schema prisma:
   - **Adaptação do Cabeçalho Principal:** O marcador circular ao lado do título do projeto ativo no header agora também herda dinamicamente `var(--accent)` no modo claro.
   - **Gradiente de Hover nos Cards:** O brilho radial de hover nas tarefas foi harmonizado para utilizar `var(--accent)` no tema claro.
 - **Documentação Relacionada:** [doc/08_harmonizacao_cores_projetos_tema_claro.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/08_harmonizacao_cores_projetos_tema_claro.md)
+
+---
+
+### [2026-09-11] - Marco 09: Renomeação e Unificação Definitiva de Branding para DevLog
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Eliminação de referências ao antigo nome de trabalho (*Project Notes*) em favor do nome oficial e consolidado **DevLog**, unificando a identidade da aplicação nos metadados globais, cabeçalhos, formulários de autenticação, telas de boas-vindas e automações de inicialização.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Metadados e SEO (`layout.tsx`):** O `title` da aba do navegador foi atualizado para `"DevLog - Seus projetos em foco"`, com descrição técnica alinhada ao propósito da plataforma.
+  - **Página de Login (`login/page.tsx`):** O cabeçalho `<h1>` principal foi atualizado para `DevLog` acima do formulário de acesso restrito.
+  - **Componente Principal (`DashboardContent.tsx`):** Unificado o título para `DevLog` no cabeçalho da barra lateral (Sidebar), no header de dispositivos móveis em estado vazio e no card central de boas-vindas do workspace.
+  - **Identificador de Página (`page.tsx`):** O componente assíncrono raiz foi renomeado de `ProjectNotesPage` para `DevLogPage`.
+  - **Script de Inicialização (`iniciar.bat`):** Janela do console e mensagem de boot atualizadas para `DevLog`.
+  - **Documentação do Repositório (`README.md`):** Incorporada seção formal "Sobre o Projeto" destacando a proposta de valor técnica e stack moderna.
+- **Documentação Relacionada:** [doc/09_renomeacao_unificacao_branding_devlog.md](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/doc/09_renomeacao_unificacao_branding_devlog.md)
 
 
 

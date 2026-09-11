@@ -7,7 +7,7 @@ import { getNotes } from "./actions/notes";
 import { getTagConfigs } from "./actions/tags";
 import DashboardContent from "./components/DashboardContent";
 
-export default async function ProjectNotesPage({ 
+export default async function DevLogPage({ 
   searchParams 
 }: { 
   searchParams: Promise<{ project?: string }> 
