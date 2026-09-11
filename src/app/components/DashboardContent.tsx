@@ -14,7 +14,7 @@ import {
   createTask, createLog, updateTaskStatus,
   deleteTask, updateTask, updateLog, deleteLog
 } from "../actions/tasks";
-import { updateTagColor } from "../actions/tags";
+import { updateTagColor, deleteTag } from "../actions/tags";
 import { createNote, updateNote, deleteNote } from "../actions/notes";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -231,10 +231,58 @@ export default function DashboardContent({
 
   const selectedProject = initialProjects.find(p => p.id === selectedProjectId);
 
-  // Extrair todas as tags únicas para sugestões (padronizadas em maiúsculas e sem duplicatas)
-  const allUniqueTags = Array.from(
-    new Set(initialTasks.flatMap(t => t.tags.map(tag => tag.trim().toUpperCase())))
-  ).filter(Boolean).sort();
+  // Todas as tags únicas do projeto (padronizadas em maiúsculas e sem duplicatas, para sugestões no modal)
+  const allUniqueTags = useMemo(() => {
+    return Array.from(
+      new Set(initialTasks.flatMap(t => t.tags.map(tag => tag.trim().toUpperCase())))
+    ).filter(Boolean).sort();
+  }, [initialTasks]);
+
+  // Tarefas no status atualmente selecionado
+  const currentStatusTasks = useMemo(() => {
+    return initialTasks.filter(t => t.status === statusFilter);
+  }, [initialTasks, statusFilter]);
+
+  // Tags contextuais ao status ativo com contagem de tarefas vinculadas
+  const contextualTagsWithCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    currentStatusTasks.forEach(t => {
+      t.tags.forEach(tag => {
+        const norm = tag.trim().toUpperCase();
+        if (norm) {
+          counts.set(norm, (counts.get(norm) || 0) + 1);
+        }
+      });
+    });
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [currentStatusTasks]);
+
+  // Auto-reset da tag selecionada caso não haja tarefas com ela no status ativo
+  useEffect(() => {
+    if (selectedTag) {
+      const existsInCurrentStatus = contextualTagsWithCount.some(
+        t => t.name.toUpperCase() === selectedTag.toUpperCase()
+      );
+      if (!existsInCurrentStatus) {
+        setSelectedTag(null);
+      }
+    }
+  }, [contextualTagsWithCount, selectedTag]);
+
+  const handleDeleteTag = (tagName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedProjectId) return;
+    if (!confirm(`Deseja remover a tag "${tagName}" de todas as tarefas deste projeto?`)) return;
+    startTransition(async () => {
+      await deleteTag(selectedProjectId, tagName);
+      if (selectedTag === tagName) {
+        setSelectedTag(null);
+      }
+    });
+  };
+
 
   // Filtrar tarefas por tag, status e busca
   const tasks = initialTasks.filter(t => {
@@ -742,24 +790,32 @@ export default function DashboardContent({
               </div>
 
               {/* Tag Filter Bar */}
-              {allUniqueTags.length > 0 && (
+              {contextualTagsWithCount.length > 0 && (
                 <div className="pb-3 flex items-center gap-2 overflow-x-auto no-scrollbar touch-pan-x w-full min-w-0 max-w-full">
                   <Filter size={14} className="text-[#666] mr-1 flex-shrink-0" />
                   <button
                     onClick={() => setSelectedTag(null)}
                     className={cn(
-                      "px-3 py-1 rounded-full text-xs font-bold transition-all border flex-shrink-0",
+                      "px-3 py-1 rounded-full text-xs font-bold transition-all border flex-shrink-0 flex items-center gap-1.5",
                       !selectedTag ? "bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)]" : "bg-[var(--surface)] border-[var(--border)] text-[#666] hover:border-[#444]"
                     )}
-                  >Todas</button>
-                  {allUniqueTags.map(tag => {
+                  >
+                    <span>Todas</span>
+                    <span className={cn(
+                      "text-[10px] px-1.5 py-0.5 rounded-full font-black",
+                      !selectedTag ? "bg-[var(--accent)]/30 text-current" : "bg-black/10 dark:bg-white/10 text-[#777]"
+                    )}>
+                      {currentStatusTasks.length}
+                    </span>
+                  </button>
+                  {contextualTagsWithCount.map(({ name: tag, count }) => {
                     const tagColor = getTagColor(tag);
                     return (
                       <div key={tag} className="relative group flex-shrink-0">
                         <button
                           onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
                           className={cn(
-                            "px-3 py-1 rounded-full text-xs font-bold transition-all border whitespace-nowrap uppercase tracking-wider",
+                            "px-3 py-1 rounded-full text-xs font-bold transition-all border whitespace-nowrap uppercase tracking-wider flex items-center gap-1.5",
                             selectedTag === tag ? "" : "bg-[var(--surface)] border-[#333] text-[#888] hover:border-[#444]"
                           )}
                           style={selectedTag === tag ? {
@@ -768,18 +824,33 @@ export default function DashboardContent({
                             color: tagColor,
                             boxShadow: `0 0 10px ${tagColor}30`
                           } : {}}
-                        >{tag}</button>
+                        >
+                          <span>{tag}</span>
+                          <span className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded-full font-black",
+                            selectedTag === tag ? "bg-white/20 text-current" : "bg-black/10 dark:bg-white/10 text-[#777]"
+                          )}>
+                            {count}
+                          </span>
+                        </button>
 
-                        {/* Seletor de cores escondido */}
-                        <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        {/* Ações da Tag: Seletor de cor e Botão de Excluir */}
+                        <div className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex items-center gap-1 bg-[#1a1a1a] border border-white/20 rounded-full px-1.5 py-0.5 shadow-md">
                           <input
                             type="color"
-                            className="w-4 h-4 rounded-full border border-white/20 bg-transparent cursor-pointer overflow-hidden p-0"
+                            className="w-3.5 h-3.5 rounded-full border border-white/20 bg-transparent cursor-pointer overflow-hidden p-0"
                             value={tagColor.startsWith('hsl') ? '#3b82f6' : tagColor}
                             onChange={(e) => handleTagColorChange(tag, e.target.value)}
                             onBlur={(e) => saveTagColorChange(tag, e.target.value)}
                             title="Mudar cor da tag"
                           />
+                          <button
+                            onClick={(e) => handleDeleteTag(tag, e)}
+                            className="text-[#888] hover:text-red-400 p-0.5 transition-colors"
+                            title={`Remover tag "${tag}" de todas as tarefas deste projeto`}
+                          >
+                            <X size={11} />
+                          </button>
                         </div>
                       </div>
                     );

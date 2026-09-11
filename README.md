@@ -29,5 +29,8 @@ Abra [http://localhost:3000](http://localhost:3000) no seu navegador.
 - **Segurança:** RBAC e Row Level Security (RLS)
 
 ## 📄 Documentação
-Para detalhes sobre decisões técnicas e evolução do projeto, consulte o arquivo [HISTORICO.md](./HISTORICO.md).
+Para detalhes sobre decisões técnicas, arquitetura e evolução do projeto, consulte:
+- [HISTORICO.md](./HISTORICO.md) — Diário cronológico de arquitetura e entregas (Marcos 01 a 06).
+- Pasta [doc/](./doc/) — Memoriais técnicos sequenciais e detalhados de cada marco.
+
 

@@ -128,6 +128,19 @@ A base de dados será orquestrada via schema prisma:
   - **Verificação Completa:** Build de produção validado em 1.7s e chunks do cliente carregados com status HTTP 200 OK sem qualquer loop.
 - **Documentação Relacionada:** [doc/05_migracao_proxy_next16_saneamento_logs.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/05_migracao_proxy_next16_saneamento_logs.md)
 
+---
+
+### [2026-09-11] - Marco 06: Expulgo de Tags Órfãs, Filtro Contextual e Gerenciamento de Tags
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Resolução da queixa de tags vazias sem tarefas gerando telas em branco ("Nenhuma tarefa encontrada neste filtro."). Unificação da tag duplicada `MELHORIAS DE UX` $\rightarrow$ `MELHORIA DE UX`, implementação de filtro contextual dinâmico por status com contadores numéricos e inclusão de rotinas automáticas de *Garbage Collection* para eliminar registros órfãos na tabela `TagConfig`.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Unificação no PostgreSQL:** Desenvolvido e executado o script idempotente `scripts/unify_ux_tags.js`, migrando a única tarefa com a tag no plural para a tag canônica `MELHORIA DE UX` e extinguindo a variante incorreta.
+  - **Rotina de Garbage Collection (`cleanupOrphanTagConfigs`):** Criada rotina em `src/app/actions/tags.ts` que inspeciona todas as tarefas dos projetos do usuário e purga automaticamente da tabela `TagConfig` qualquer registro de cor cuja tag não esteja mais presente em nenhuma tarefa ativa.
+  - **Ação de Exclusão Direta (`deleteTag`):** Implementada Server Action para desvincular uma tag de todas as tarefas de um projeto em lote, acionando em seguida a limpeza em `TagConfig` e a revalidação de cache.
+  - **Auto-Cleanup em Mutação de Tarefas:** Integrada a chamada de `cleanupOrphanTagConfigs` em `updateTask` e `deleteTask` (`src/app/actions/tasks.ts`), garantindo saneamento contínuo do banco.
+  - **Filtro Contextual e Contadores Dinâmicos (Frontend):** Atualizado `DashboardContent.tsx` para derivar as tags exibidas a partir das tarefas do status atualmente ativo (`pending` vs `completed`). Tags com 0 tarefas no status ativo não são exibidas. Cada botão exibe agora um badge com a contagem exata de tarefas (ex: `MELHORIA DE UX (4)`). Adicionado botão de remoção rápida com confirmação no hover de cada tag e auto-reset da seleção ao alternar de aba.
+- **Documentação Relacionada:** [doc/06_expulgo_tags_orfas_filtro_contextual.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/06_expulgo_tags_orfas_filtro_contextual.md)
+
+
 
 
 

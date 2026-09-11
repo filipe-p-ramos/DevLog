@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { getUserId } from "./auth";
+import { cleanupOrphanTagConfigs } from "./tags";
+
 
 export async function getTasks(projectId: string) {
   const userId = await getUserId();
@@ -68,21 +70,28 @@ export async function updateTaskStatus(id: string, status: string) {
 }
 
 export async function updateTask(id: string, title: string, description: string, tags: string[]) {
+  const userId = await getUserId();
   const cleanTags = sanitizeTags(tags);
 
   await prisma.task.update({
     where: { id },
     data: { title, description, tags: cleanTags },
   });
+
+  await cleanupOrphanTagConfigs(userId);
   revalidatePath("/");
 }
 
 export async function deleteTask(id: string) {
+  const userId = await getUserId();
   await prisma.task.delete({
     where: { id },
   });
+
+  await cleanupOrphanTagConfigs(userId);
   revalidatePath("/");
 }
+
 
 export async function createLog(taskId: string, content: string, type: string = "note", attachments: string[] = []) {
   console.log(`[DEBUG] createLog chamada para taskId: ${taskId}`);
