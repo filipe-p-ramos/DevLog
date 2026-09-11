@@ -25,6 +25,16 @@ export async function getTasks(projectId: string) {
   });
 }
 
+function sanitizeTags(tags: string[] = []): string[] {
+  return Array.from(
+    new Set(
+      tags
+        .map(t => (typeof t === "string" ? t.trim().toUpperCase() : ""))
+        .filter(Boolean)
+    )
+  );
+}
+
 export async function createTask(projectId: string, title: string, description: string = "", tags: string[] = [], attachments: string[] = []) {
   const userId = await getUserId();
 
@@ -35,12 +45,14 @@ export async function createTask(projectId: string, title: string, description: 
 
   if (!project) throw new Error("Acesso negado");
 
+  const cleanTags = sanitizeTags(tags);
+
   await prisma.task.create({
     data: {
       title,
       description,
       projectId,
-      tags,
+      tags: cleanTags,
       attachments,
     },
   });
@@ -56,9 +68,11 @@ export async function updateTaskStatus(id: string, status: string) {
 }
 
 export async function updateTask(id: string, title: string, description: string, tags: string[]) {
+  const cleanTags = sanitizeTags(tags);
+
   await prisma.task.update({
     where: { id },
-    data: { title, description, tags },
+    data: { title, description, tags: cleanTags },
   });
   revalidatePath("/");
 }

@@ -105,4 +105,29 @@ A base de dados será orquestrada via schema prisma:
   - **Variáveis de Ambiente:** Remoção da variável vulnerável `APP_PASSWORD` de `.env` e `config.env`.
 - **Documentação Relacionada:** [doc/03_autenticacao_senhas_individuais.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/03_autenticacao_senhas_individuais.md)
 
+---
+
+### [2026-09-11] - Marco 04: Padronização e Unificação de Tags em Caixa Alta (UPPERCASE)
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Eliminação da fragmentação na barra de filtros e no agrupamento de tarefas originada por variações de capitalização (ex: `URGENTE` e `Urgente`, `BUG` e `Bug`). Padronização compulsória de todas as tags em maiúsculas tanto na interface quanto no backend e banco de dados.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Migração e Sanitização de Banco de Dados:** Executado o script idempotente `scripts/migrate_tags_uppercase.js`, atualizando 58 tarefas para converter todas as tags para caixa alta (`.toUpperCase()`) e deduplicar arrays no PostgreSQL, além de padronizar as configurações de cores na tabela `TagConfig`.
+  - **Proteção no Backend (Server Actions):** Implementada a função utilitária `sanitizeTags` em `src/app/actions/tasks.ts`, sanitizando e deduplicando tags em `createTask` e `updateTask`. Normalização em maiúsculas aplicada em `updateTagColor` (`src/app/actions/tags.ts`).
+  - **Interface & Experiência de Usuário (Frontend):** Atualizado `DashboardContent.tsx` com input de tags em `uppercase` e feedback em tempo real (`onChange`), deduplicação e ordenação em `allUniqueTags`, filtro resiliente de tarefas (`matchesTag`) e busca case-insensitive.
+  - **Estabilidade do Ambiente Local e Autenticação:** Script `"dev": "next dev --webpack"` configurado no `package.json` para contornar o bug do Turbopack no Windows ao lidar com caminhos contendo espaço (`Google Antigravity`). Resolvida incompatibilidade de parâmetros de Server Action com `useActionState` no React 19 e corrigido erro 500 de modificação de cookies em Server Components.
+- **Documentação Relacionada:** [doc/04_padronizacao_maiusculas_unificacao_tags.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/04_padronizacao_maiusculas_unificacao_tags.md)
+
+---
+
+### [2026-09-11] - Marco 05: Migração para Proxy Next.js 16, Saneamento de Logs e Resolução de Hydration Loop
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Resolução definitiva do erro em tela no navegador (`Runtime Error: Element type is invalid. Received a promise that resolves to: undefined`) e do loop de hidratação surgido no Marco 04. Eliminação do aviso amarelo de depreciação do Next.js 16 (`middleware` $\rightarrow$ `proxy`) e saneamento de logs do Prisma no terminal.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Reversão para Motor Nativo Turbopack:** No `package.json`, restaurado `"dev": "next dev"`, removendo a flag `--webpack` inserida no Marco 04. Identificou-se que o Webpack no Next.js 16/React 19 sofria um erro de escape de caminhos no Windows com espaços (`Google Antigravity`), fazendo com que o Client Component `DashboardContent` não fosse resolvido pelo chunk loader do browser (gerando `undefined` e o loop em tela).
+  - **Purga de Cache `.next`:** Removidos todos os artefatos de cache defasados (`stale`) do compilador Webpack.
+  - **Migração para Convenção `proxy.ts` (Next.js 16):** Criado `src/proxy.ts` e exportada a função `proxy()` em conformidade com a nova arquitetura Node.js do Next.js 16, removendo `src/middleware.ts`.
+  - **Saneamento de Logs do Prisma Client (`src/lib/db.ts`):** Ajustado o nível de log padrão de `log: ["query"]` para `["error", "warn"]`, eliminando a colisão de buffers ANSI no terminal.
+  - **Verificação Completa:** Build de produção validado em 1.7s e chunks do cliente carregados com status HTTP 200 OK sem qualquer loop.
+- **Documentação Relacionada:** [doc/05_migracao_proxy_next16_saneamento_logs.md](file:///c:/Users/filipe.ramos/Documents/Google%20Antigravity/Project_notes/doc/05_migracao_proxy_next16_saneamento_logs.md)
+
+
+
 

@@ -113,12 +113,15 @@ export default function DashboardContent({
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editingLogContent, setEditingLogContent] = useState("");
 
-  // Mapeamento de cores personalizadas
+  // Mapeamento de cores personalizadas (normalizado em maiúsculas)
   const [customTagColors, setCustomTagColors] = useState<Record<string, string>>(
-    Object.fromEntries(tagConfigs.map(c => [c.name, c.color]))
+    Object.fromEntries(tagConfigs.map(c => [c.name.trim().toUpperCase(), c.color]))
   );
 
-  const getTagColor = (tag: string) => customTagColors[tag] || generateFallbackColor(tag);
+  const getTagColor = (tag: string) => {
+    const normalized = tag.trim().toUpperCase();
+    return customTagColors[normalized] || generateFallbackColor(normalized);
+  };
 
   // Estados de Notas
   const [newNoteContent, setNewNoteContent] = useState("");
@@ -209,12 +212,14 @@ export default function DashboardContent({
     });
   };
   const handleTagColorChange = (tag: string, color: string) => {
-    setCustomTagColors(prev => ({ ...prev, [tag]: color }));
+    const normalized = tag.trim().toUpperCase();
+    setCustomTagColors(prev => ({ ...prev, [normalized]: color }));
   };
 
   const saveTagColorChange = (tag: string, color: string) => {
+    const normalized = tag.trim().toUpperCase();
     startTransition(async () => {
-      await updateTagColor(tag, color);
+      await updateTagColor(normalized, color);
     });
   };
 
@@ -226,12 +231,14 @@ export default function DashboardContent({
 
   const selectedProject = initialProjects.find(p => p.id === selectedProjectId);
 
-  // Extrair todas as tags únicas para sugestões
-  const allUniqueTags = Array.from(new Set(initialTasks.flatMap(t => t.tags))).sort();
+  // Extrair todas as tags únicas para sugestões (padronizadas em maiúsculas e sem duplicatas)
+  const allUniqueTags = Array.from(
+    new Set(initialTasks.flatMap(t => t.tags.map(tag => tag.trim().toUpperCase())))
+  ).filter(Boolean).sort();
 
   // Filtrar tarefas por tag, status e busca
   const tasks = initialTasks.filter(t => {
-    const matchesTag = !selectedTag || t.tags.includes(selectedTag);
+    const matchesTag = !selectedTag || t.tags.some(tag => tag.trim().toUpperCase() === selectedTag.trim().toUpperCase());
     const matchesStatus = t.status === statusFilter;
     
     const query = searchQuery.toLowerCase();
@@ -290,10 +297,19 @@ export default function DashboardContent({
   const handleCreateTask = () => {
     if (!newTaskTitle || !selectedProjectId) return;
     startTransition(async () => {
+      const parsedTags = Array.from(
+        new Set(
+          newTaskTags
+            .split(",")
+            .map(t => t.trim().toUpperCase())
+            .filter(Boolean)
+        )
+      );
+
       if (editingTask) {
-        await updateTask(editingTask.id, newTaskTitle, newTaskDescription, newTaskTags.split(",").map(t => t.trim()).filter(t => t));
+        await updateTask(editingTask.id, newTaskTitle, newTaskDescription, parsedTags);
       } else {
-        await createTask(selectedProjectId, newTaskTitle, newTaskDescription, newTaskTags.split(",").map(t => t.trim()).filter(t => t), tempTaskAttachments);
+        await createTask(selectedProjectId, newTaskTitle, newTaskDescription, parsedTags, tempTaskAttachments);
       }
       setNewTaskTitle("");
       setNewTaskDescription("");
@@ -315,7 +331,7 @@ export default function DashboardContent({
     setEditingTask(task);
     setNewTaskTitle(task.title);
     setNewTaskDescription(task.description || "");
-    setNewTaskTags(task.tags.join(", "));
+    setNewTaskTags(task.tags.map(t => t.toUpperCase()).join(", "));
     setIsTaskModalOpen(true);
   };
 
@@ -743,7 +759,7 @@ export default function DashboardContent({
                         <button
                           onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
                           className={cn(
-                            "px-3 py-1 rounded-full text-xs font-bold transition-all border whitespace-nowrap",
+                            "px-3 py-1 rounded-full text-xs font-bold transition-all border whitespace-nowrap uppercase tracking-wider",
                             selectedTag === tag ? "" : "bg-[var(--surface)] border-[#333] text-[#888] hover:border-[#444]"
                           )}
                           style={selectedTag === tag ? {
@@ -1552,10 +1568,10 @@ export default function DashboardContent({
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-[#888] mb-1.5">Tags (separadas por vírgula)</label>
                 <input
-                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--accent)] text-base sm:text-sm"
-                  placeholder="ex: design, backend, urgente"
+                  className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--accent)] text-base sm:text-sm uppercase"
+                  placeholder="EX: DESIGN, BACKEND, URGENTE"
                   value={newTaskTags}
-                  onChange={(e) => setNewTaskTags(e.target.value)}
+                  onChange={(e) => setNewTaskTags(e.target.value.toUpperCase())}
                   list="tag-suggestions"
                 />
                 <datalist id="tag-suggestions">

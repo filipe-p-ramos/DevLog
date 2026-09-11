@@ -14,19 +14,21 @@ export async function getTagConfigs() {
 
 export async function updateTagColor(name: string, color: string) {
   const userId = await getUserId();
+  const normalizedName = name.trim().toUpperCase();
+  if (!normalizedName) return;
   
   await prisma.tagConfig.upsert({
     where: {
       userId_name: {
         userId,
-        name,
+        name: normalizedName,
       },
     },
     update: {
       color,
     },
     create: {
-      name,
+      name: normalizedName,
       color,
       userId,
     },

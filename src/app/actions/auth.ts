@@ -6,7 +6,17 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 
-export async function loginWithPassword(formData: FormData) {
+export async function loginWithPassword(prevStateOrFormData: any, maybeFormData?: FormData) {
+  const formData = (maybeFormData && typeof (maybeFormData as any).get === "function")
+    ? maybeFormData
+    : (prevStateOrFormData && typeof (prevStateOrFormData as any).get === "function")
+      ? (prevStateOrFormData as FormData)
+      : null;
+
+  if (!formData) {
+    return { error: "Credenciais inválidas" };
+  }
+
   const username = (formData.get("username") as string)?.trim();
   const password = formData.get("password") as string;
 
@@ -52,8 +62,18 @@ export async function getUserId() {
   const userId = cookieStore.get("auth_token")?.value;
   
   if (!userId) {
-    throw new Error("Não autenticado");
+    redirect("/login");
+  }
+
+  // Validar se o usuário existe no banco de dados (previne sessões presas com usuários purgados)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+
+  if (!user) {
+    redirect("/login?reset=1");
   }
   
-  return userId;
+  return user.id;
 }

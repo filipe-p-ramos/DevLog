@@ -6,9 +6,7 @@ import { LockKeyhole, ArrowRight } from "lucide-react";
 
 export default function LoginPage() {
   const [state, action, isPending] = useActionState(
-    async (prevState: any, formData: FormData) => {
-      return await loginWithPassword(formData);
-    },
+    loginWithPassword,
     null
   );
 
@@ -70,6 +68,16 @@ export default function LoginPage() {
             {isPending ? "Verificando..." : "Entrar no Workspace"}
             {!isPending && <ArrowRight className="w-4 h-4" />}
           </button>
+
+          <div className="mt-5 text-center">
+            <a 
+              href="/login?reset=1" 
+              className="text-xs text-[#666] hover:text-blue-400 transition-colors underline underline-offset-4 cursor-pointer"
+              title="Limpar cookies residuais e redefinir sessão"
+            >
+              Problemas para entrar? Clique aqui para limpar a sessão
+            </a>
+          </div>
         </form>
       </div>
     </div>
