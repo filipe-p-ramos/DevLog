@@ -22,6 +22,9 @@ export async function getTasks(projectId: string) {
       logs: {
         orderBy: { createdAt: "asc" },
       },
+      subtasks: {
+        orderBy: { createdAt: "asc" },
+      },
     },
     orderBy: { updatedAt: "desc" },
   });
@@ -141,3 +144,78 @@ export async function deleteLog(id: string) {
 
   revalidatePath("/");
 }
+
+export async function createSubtask(taskId: string, title: string) {
+  const cleanTitle = title.trim();
+  if (!cleanTitle) return;
+
+  await prisma.$transaction([
+    prisma.subtask.create({
+      data: {
+        taskId,
+        title: cleanTitle,
+      },
+    }),
+    prisma.task.update({
+      where: { id: taskId },
+      data: { updatedAt: new Date() },
+    }),
+  ]);
+
+  revalidatePath("/");
+}
+
+export async function toggleSubtask(id: string, completed: boolean, resolutionNote?: string | null) {
+  const subtask = await prisma.subtask.update({
+    where: { id },
+    data: {
+      completed,
+      completedAt: completed ? new Date() : null,
+      resolutionNote: completed ? (resolutionNote?.trim() || null) : resolutionNote,
+    },
+    select: { taskId: true },
+  });
+
+  await prisma.task.update({
+    where: { id: subtask.taskId },
+    data: { updatedAt: new Date() },
+  });
+
+  revalidatePath("/");
+}
+
+export async function updateSubtask(id: string, title: string, resolutionNote?: string | null) {
+  const cleanTitle = title.trim();
+  if (!cleanTitle) return;
+
+  const subtask = await prisma.subtask.update({
+    where: { id },
+    data: {
+      title: cleanTitle,
+      resolutionNote: resolutionNote !== undefined ? (resolutionNote?.trim() || null) : undefined,
+    },
+    select: { taskId: true },
+  });
+
+  await prisma.task.update({
+    where: { id: subtask.taskId },
+    data: { updatedAt: new Date() },
+  });
+
+  revalidatePath("/");
+}
+
+export async function deleteSubtask(id: string) {
+  const subtask = await prisma.subtask.delete({
+    where: { id },
+    select: { taskId: true },
+  });
+
+  await prisma.task.update({
+    where: { id: subtask.taskId },
+    data: { updatedAt: new Date() },
+  });
+
+  revalidatePath("/");
+}
+

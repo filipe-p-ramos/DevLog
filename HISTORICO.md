@@ -262,6 +262,21 @@ A base de dados será orquestrada via schema prisma:
   - **Harmonização da Ação de Excluir Tarefa:** O botão de exclusão de tarefas dentro do modal também foi integrado a `animateItemExit`, assegurando física consistente em todos os pontos de saída da janela flutuante.
 - **Documentação Relacionada:** [doc/16_animacao_fechamento_modal_conclusao_tarefa.md](./doc/16_animacao_fechamento_modal_conclusao_tarefa.md)
 
+---
+
+### [2026-09-12] - Marco 17: Subtarefas e Ações Pendentes com Registro de Resolução
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Implementação do recurso de Subtarefas e Ações Pendentes com checklist interativo e campo de registro de resolução dentro do modal de detalhes da tarefa, permitindo ao desenvolvedor listar etapas de teste/validação técnica, marcá-las como concluídas e documentar formalmente o que resolveu o problema.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Modelagem Relacional (Prisma & PostgreSQL):** Criação da entidade `Subtask` vinculada à `Task` pai com exclusão em cascata (`onDelete: Cascade`), campos de auditoria (`completedAt`, `resolutionNote`) e índice de performance em `taskId`. Migração aplicada via `npx prisma db push`.
+  - **Server Actions Sanitizadas (`src/app/actions/tasks.ts`):** Desenvolvimento de ações atômicas tipadas (`createSubtask`, `toggleSubtask`, `updateSubtask`, `deleteSubtask`) com atualização de `updatedAt` na tarefa pai e revalidação via `revalidatePath`.
+  - **Seção de Subtarefas no Modal de Detalhes (`DashboardContent.tsx`):** Criação de seção dedicada posicionada antes dos andamentos, com contagem de progresso `(X/Y)`, badge de "Todas Concluídas", formulário inline de nova ação e checklist interativo.
+  - **Fluxo de Resolução Assistida:** Ao clicar para concluir uma ação pendente, o sistema abre uma interface inline perguntando *"Como você resolveu / resultado do teste?"*, permitindo salvar a nota explicativa ou concluir sem nota. Exibe box destacado com a nota e data/hora da resolução. Permite reabertura a qualquer momento para novos testes.
+  - **Indicador no Quadro Principal (`renderTaskCard`):** Badge sutil com ícone `ListTodo` no rodapé dos cards de tarefas indicando a proporção de ações concluídas (`X/Y`), com destaque verde esmeralda quando 100% finalizadas.
+  - **Busca Unificada Inteligente:** A busca do painel foi aprimorada para pesquisar termos dentro dos títulos e notas de resolução das subtarefas.
+  - **Calibração de Contraste e Acessibilidade (WCAG):** Ajustada a paleta cromática do box de resolução, badges e títulos no tema claro (sépia/caderno), substituindo o tom verde desbotado por verde floresta escuro de alta densidade (`text-emerald-950`), texto de resolução sólido sem opacidade e bordas nítidas para garantir legibilidade absoluta.
+- **Documentação Relacionada:** [doc/17_subtarefas_e_acoes_pendentes.md](./doc/17_subtarefas_e_acoes_pendentes.md)
+
+
 
 
 

@@ -6,14 +6,16 @@ import {
   Trash2, Edit2, X, MessageSquare,
   ChevronUp, ChevronDown, Menu, Sun, Moon, Search, List, LayoutGrid,
   FileText, FileCode, File, Download, Send, MoreVertical,
-  Settings, KeyRound, Eye, EyeOff, AlertCircle
+  Settings, KeyRound, Eye, EyeOff, AlertCircle,
+  CheckSquare, Square, ListTodo, CornerDownLeft, Check
 } from "lucide-react";
 
 import { logout, changePassword } from "../actions/auth";
 import { createProject, updateProject, deleteProject, reorderProjects } from "../actions/projects";
 import {
   createTask, createLog, updateTaskStatus,
-  deleteTask, updateTask, updateLog, deleteLog
+  deleteTask, updateTask, updateLog, deleteLog,
+  createSubtask, toggleSubtask, updateSubtask, deleteSubtask
 } from "../actions/tasks";
 import { updateTagColor, deleteTag } from "../actions/tags";
 import { createNote, updateNote, deleteNote } from "../actions/notes";
@@ -74,6 +76,15 @@ interface Log {
   createdAt: Date | string;
 }
 
+interface Subtask {
+  id: string;
+  title: string;
+  completed: boolean;
+  resolutionNote?: string | null;
+  completedAt?: Date | string | null;
+  createdAt: Date | string;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -81,6 +92,7 @@ interface Task {
   attachments: string[];
   status: string;
   tags: string[];
+  subtasks?: Subtask[];
   logs: Log[];
   createdAt: Date | string;
 }
@@ -130,6 +142,15 @@ export default function DashboardContent({
   const [newLogContent, setNewLogContent] = useState("");
   const [editingLogId, setEditingLogId] = useState<string | null>(null);
   const [editingLogContent, setEditingLogContent] = useState("");
+
+  // Estados de Subtarefas & Ações Pendentes
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [completingSubtaskId, setCompletingSubtaskId] = useState<string | null>(null);
+  const [subtaskResolutionInput, setSubtaskResolutionInput] = useState("");
+  const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
+  const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
+  const [editingSubtaskResolution, setEditingSubtaskResolution] = useState("");
 
   // Mapeamento de cores personalizadas (normalizado em maiúsculas)
   const [customTagColors, setCustomTagColors] = useState<Record<string, string>>(
@@ -576,6 +597,10 @@ export default function DashboardContent({
         t.title.toLowerCase().includes(query) ||
         (t.description || "").toLowerCase().includes(query) ||
         t.logs.some(l => l.content.toLowerCase().includes(query)) ||
+        (t.subtasks && t.subtasks.some(s => 
+          s.title.toLowerCase().includes(query) || 
+          (s.resolutionNote && s.resolutionNote.toLowerCase().includes(query))
+        )) ||
         t.tags.some(tag => tag.toLowerCase().includes(query));
 
       return matchesTag && matchesQuery;
@@ -793,6 +818,65 @@ export default function DashboardContent({
       await deleteLog(id);
     });
   };
+
+  // Handlers de Subtarefas & Ações Pendentes
+  const handleCreateSubtask = (taskId: string) => {
+    if (!newSubtaskTitle.trim()) return;
+    const title = newSubtaskTitle.trim();
+    startTransition(async () => {
+      await createSubtask(taskId, title);
+      setNewSubtaskTitle("");
+      setIsAddingSubtask(false);
+    });
+  };
+
+  const handleToggleSubtaskCheckbox = (subtask: Subtask) => {
+    if (subtask.completed) {
+      // Reabrir subtarefa
+      startTransition(async () => {
+        await toggleSubtask(subtask.id, false);
+      });
+    } else {
+      // Abrir campo inline para registrar resolução
+      setCompletingSubtaskId(subtask.id);
+      setSubtaskResolutionInput(subtask.resolutionNote || "");
+    }
+  };
+
+  const handleConfirmCompleteSubtask = (subtaskId: string, withNote: boolean = true) => {
+    const note = withNote ? subtaskResolutionInput.trim() : null;
+    startTransition(async () => {
+      await toggleSubtask(subtaskId, true, note);
+      setCompletingSubtaskId(null);
+      setSubtaskResolutionInput("");
+    });
+  };
+
+  const handleStartEditSubtask = (subtask: Subtask) => {
+    setEditingSubtaskId(subtask.id);
+    setEditingSubtaskTitle(subtask.title);
+    setEditingSubtaskResolution(subtask.resolutionNote || "");
+  };
+
+  const handleSaveEditSubtask = (subtaskId: string) => {
+    if (!editingSubtaskTitle.trim()) return;
+    startTransition(async () => {
+      await updateSubtask(subtaskId, editingSubtaskTitle.trim(), editingSubtaskResolution.trim() || null);
+      setEditingSubtaskId(null);
+      setEditingSubtaskTitle("");
+      setEditingSubtaskResolution("");
+    });
+  };
+
+  const handleDeleteSubtask = (subtaskId: string) => {
+    if (!confirm("Excluir esta ação pendente?")) return;
+    startTransition(async () => {
+      await deleteSubtask(subtaskId);
+      if (completingSubtaskId === subtaskId) setCompletingSubtaskId(null);
+      if (editingSubtaskId === subtaskId) setEditingSubtaskId(null);
+    });
+  };
+
 
   const handleMoveProject = (id: string, direction: 'up' | 'down') => {
     const currentIndex = initialProjects.findIndex(p => p.id === id);
@@ -1040,6 +1124,24 @@ export default function DashboardContent({
                 })}
               </div>
               <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                {task.subtasks && task.subtasks.length > 0 && (
+                  <span
+                    className={cn(
+                      "font-bold uppercase tracking-widest flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded border transition-all shadow-sm",
+                      viewMode === 'list' 
+                        ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)]" 
+                        : "text-[9px] sm:text-[10px]"
+                    )}
+                    style={{
+                      color: task.subtasks.every(s => s.completed) ? '#10b981' : (theme === 'light' ? 'var(--accent)' : (selectedProject?.color || 'var(--accent)')),
+                      borderColor: task.subtasks.every(s => s.completed) ? '#10b98140' : (theme === 'light' ? 'var(--accent)40' : `${selectedProject?.color || 'var(--accent)'}40`),
+                      backgroundColor: task.subtasks.every(s => s.completed) ? '#10b98110' : undefined
+                    }}
+                    title={`${task.subtasks.filter(s => s.completed).length} de ${task.subtasks.length} ações concluídas`}
+                  >
+                    <ListTodo size={10} /> {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+                  </span>
+                )}
                 <span
                   className={cn(
                     "font-bold uppercase tracking-widest flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded border transition-all",
@@ -1856,6 +1958,254 @@ export default function DashboardContent({
                     </div>
                   )}
                   <p className="text-xs text-[#555] font-bold uppercase tracking-wider">Criada em {new Date(selectedTaskForDetail.createdAt).toLocaleString()}</p>
+                </section>
+
+                <div className="h-px bg-[var(--border)]" />
+
+                {/* Subtarefas & Ações Pendentes */}
+                <section className="space-y-4 sm:space-y-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-xs sm:text-sm font-bold text-[#888] uppercase tracking-widest flex items-center gap-2">
+                        <ListTodo size={16} className="text-[var(--accent)]" /> 
+                        Ações Pendentes / Subtarefas {(selectedTaskForDetail.subtasks || []).length > 0 && (
+                          <span className="text-[var(--foreground)]">
+                            ({(selectedTaskForDetail.subtasks || []).filter(s => s.completed).length}/{(selectedTaskForDetail.subtasks || []).length})
+                          </span>
+                        )}
+                      </h3>
+                      {(selectedTaskForDetail.subtasks || []).length > 0 && 
+                       (selectedTaskForDetail.subtasks || []).every(s => s.completed) && (
+                        <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-emerald-900/15 dark:bg-emerald-500/15 text-emerald-900 dark:text-emerald-300 border border-emerald-800/30 dark:border-emerald-500/30">
+                          Todas Concluídas
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setIsAddingSubtask(!isAddingSubtask)}
+                      className={cn(
+                        "px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 shadow-lg border",
+                        isAddingSubtask 
+                          ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20" 
+                          : "bg-[var(--surface-hover)] border-[var(--border)] text-[var(--foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                      )}
+                    >
+                      {isAddingSubtask ? <X size={13} strokeWidth={3} /> : <Plus size={13} strokeWidth={3} />}
+                      {isAddingSubtask ? "Cancelar" : "Nova Ação / Pendência"}
+                    </button>
+                  </div>
+
+                  {/* Formulário para Adicionar Subtarefa */}
+                  {isAddingSubtask && (
+                    <div className="bg-[var(--surface)] border border-[var(--accent)]/40 rounded-xl p-3 sm:p-4 shadow-md space-y-2.5">
+                      <label className="text-[11px] font-bold text-[#888] uppercase tracking-wider block">
+                        O que precisa ser feito ou testado?
+                      </label>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          autoFocus
+                          placeholder="Ex: Testar login após atualização do app subir na loja..."
+                          value={newSubtaskTitle}
+                          onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCreateSubtask(selectedTaskForDetail.id);
+                            }
+                          }}
+                          className="flex-1 bg-[var(--background)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--accent)] transition-all"
+                        />
+                        <button
+                          onClick={() => handleCreateSubtask(selectedTaskForDetail.id)}
+                          disabled={!newSubtaskTitle.trim()}
+                          className="px-4 py-2 bg-[var(--accent)] text-[var(--background)] rounded-lg text-xs font-bold uppercase disabled:opacity-40 hover:opacity-90 transition-all flex items-center justify-center gap-1.5 shadow-md flex-shrink-0"
+                        >
+                          <Plus size={14} /> Adicionar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Listagem de Subtarefas */}
+                  {(!selectedTaskForDetail.subtasks || selectedTaskForDetail.subtasks.length === 0) ? (
+                    <div className="py-4 px-4 border border-dashed border-[var(--border)] rounded-xl text-center text-xs text-[#777]">
+                      Nenhuma ação pendente ou subtarefa registrada. Use o botão acima para listar testes, validações ou hipóteses de correção.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {selectedTaskForDetail.subtasks.map((subtask) => {
+                        const isCompleting = completingSubtaskId === subtask.id;
+                        const isEditing = editingSubtaskId === subtask.id;
+
+                        return (
+                          <div
+                            key={subtask.id}
+                            className={cn(
+                              "bg-[var(--surface)] border rounded-xl p-3 sm:p-4 transition-all group relative overflow-hidden",
+                              subtask.completed 
+                                ? "border-emerald-700/30 dark:border-emerald-500/30 bg-emerald-800/[0.04] dark:bg-emerald-500/[0.03]" 
+                                : "border-[var(--border)] hover:border-[var(--accent)]/40 shadow-sm"
+                            )}
+                          >
+                            {/* Visualização de Edição */}
+                            {isEditing ? (
+                              <div className="space-y-3">
+                                <div>
+                                  <label className="text-[10px] font-bold text-[#888] uppercase block mb-1">Título da Ação</label>
+                                  <input
+                                    type="text"
+                                    value={editingSubtaskTitle}
+                                    onChange={(e) => setEditingSubtaskTitle(e.target.value)}
+                                    className="w-full bg-[var(--background)] border border-[var(--accent)]/50 rounded-lg p-2.5 text-sm text-[var(--foreground)] focus:outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[10px] font-bold text-[#888] uppercase block mb-1">Nota de Resolução / Resultado do Teste</label>
+                                  <textarea
+                                    value={editingSubtaskResolution}
+                                    onChange={(e) => setEditingSubtaskResolution(e.target.value)}
+                                    placeholder="Descreva o que foi feito ou o resultado do teste..."
+                                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg p-2.5 text-xs text-[var(--foreground)] focus:outline-none min-h-[70px]"
+                                  />
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={() => setEditingSubtaskId(null)}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase text-[#888] hover:text-[var(--foreground)]"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button
+                                    onClick={() => handleSaveEditSubtask(subtask.id)}
+                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-[var(--accent)] text-[var(--background)] rounded-md hover:opacity-90 transition-opacity"
+                                  >
+                                    Salvar Alterações
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex items-start justify-between gap-3">
+                                  {/* Checkbox e Título */}
+                                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                                    <button
+                                      onClick={() => handleToggleSubtaskCheckbox(subtask)}
+                                      className={cn(
+                                        "mt-0.5 flex-shrink-0 transition-transform active:scale-90",
+                                        subtask.completed ? "text-emerald-800 dark:text-emerald-400" : "text-[#777] hover:text-[var(--accent)]"
+                                      )}
+                                      title={subtask.completed ? "Clique para reabrir esta ação" : "Clique para marcar como resolvida"}
+                                    >
+                                      {subtask.completed ? (
+                                        <CheckSquare size={19} className="text-emerald-800 dark:text-emerald-400" />
+                                      ) : (
+                                        <Square size={19} />
+                                      )}
+                                    </button>
+
+                                    <div className="flex-1 min-w-0">
+                                      <div className={cn(
+                                        "text-sm font-semibold leading-relaxed break-words [overflow-wrap:anywhere]",
+                                        subtask.completed ? "line-through text-[var(--foreground)] opacity-70" : "text-[var(--foreground)]"
+                                      )}>
+                                        {subtask.title}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Ações Rápidas */}
+                                  <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex-shrink-0">
+                                    <button
+                                      onClick={() => handleStartEditSubtask(subtask)}
+                                      className="p-1.5 text-[#888] hover:text-blue-400 rounded transition-colors"
+                                      title="Editar ação"
+                                    >
+                                      <Edit2 size={13} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteSubtask(subtask.id)}
+                                      className="p-1.5 text-[#888] hover:text-red-400 rounded transition-colors"
+                                      title="Excluir ação"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Seção Expansível de Conclusão: "O que você resolveu?" */}
+                                {isCompleting && (
+                                  <div className="mt-3 pt-3 border-t border-[var(--border)] bg-[var(--background)]/80 -mx-3 -mb-3 sm:-mx-4 sm:-mb-4 p-3 sm:p-4 rounded-b-xl space-y-2.5">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-bold text-emerald-900 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                                        <Check size={14} strokeWidth={3} /> Conclusão da Ação: O que você resolveu?
+                                      </span>
+                                      <button
+                                        onClick={() => setCompletingSubtaskId(null)}
+                                        className="text-[#888] hover:text-[var(--foreground)] p-1"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    </div>
+                                    <textarea
+                                      autoFocus
+                                      value={subtaskResolutionInput}
+                                      onChange={(e) => setSubtaskResolutionInput(e.target.value)}
+                                      placeholder="Ex: Testado no app v1.2, login Google funcionou perfeitamente. / Ou descreva o resultado do teste..."
+                                      className="w-full bg-[var(--surface)] border border-emerald-700/40 dark:border-emerald-500/40 rounded-lg p-2.5 text-xs text-[var(--foreground)] focus:outline-none focus:border-emerald-600 min-h-[60px]"
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                                          handleConfirmCompleteSubtask(subtask.id, true);
+                                        }
+                                      }}
+                                    />
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                                      <span className="text-[10px] text-[#666] dark:text-[#aaa]">
+                                        Dica: você pode detalhar o teste ou concluir sem nota.
+                                      </span>
+                                      <div className="flex items-center gap-2 self-end">
+                                        <button
+                                          onClick={() => handleConfirmCompleteSubtask(subtask.id, false)}
+                                          className="px-2.5 py-1.5 text-[10px] font-bold uppercase text-[#777] dark:text-[#aaa] hover:text-[var(--foreground)] transition-colors"
+                                        >
+                                          Concluir sem nota
+                                        </button>
+                                        <button
+                                          onClick={() => handleConfirmCompleteSubtask(subtask.id, true)}
+                                          className="px-3.5 py-1.5 text-[10px] font-black uppercase bg-emerald-700 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-md transition-all shadow-md flex items-center gap-1"
+                                        >
+                                          <Check size={12} strokeWidth={3} /> Concluir com Resolução
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Nota de Resolução Persistida (quando concluída com nota) */}
+                                {subtask.completed && subtask.resolutionNote && !isCompleting && (
+                                  <div className="mt-3 ml-2 sm:ml-7 p-3 sm:p-3.5 bg-emerald-950/[0.08] dark:bg-emerald-950/30 border border-emerald-800/35 dark:border-emerald-500/30 rounded-xl shadow-sm">
+                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                      <span className="text-xs font-black uppercase text-emerald-950 dark:text-emerald-300 flex items-center gap-1.5 tracking-wide">
+                                        <Check size={13} strokeWidth={3} className="text-emerald-800 dark:text-emerald-400" /> Resolução / Resultado do Teste:
+                                      </span>
+                                      {subtask.completedAt && (
+                                        <span className="text-[10px] text-[#555] dark:text-[#aaa] font-bold">
+                                          {new Date(subtask.completedAt).toLocaleString()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-[var(--foreground)] font-medium leading-relaxed italic">
+                                      {subtask.resolutionNote}
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </section>
 
                 <div className="h-px bg-[var(--border)]" />

@@ -40,6 +40,14 @@ export default async function DevLogPage({
         status: t.status,
         tags: t.tags,
         createdAt: t.createdAt,
+        subtasks: (t.subtasks || []).map(s => ({
+          id: s.id,
+          title: s.title,
+          completed: s.completed,
+          resolutionNote: s.resolutionNote,
+          completedAt: s.completedAt,
+          createdAt: s.createdAt
+        })),
         logs: t.logs.map(l => ({
           id: l.id,
           content: l.content,
