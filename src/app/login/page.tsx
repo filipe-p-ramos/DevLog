@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#111111] p-4 font-sans text-[#ededed]">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md animate-in fade-in duration-500">
         <div className="text-center mb-10">
           <div className="w-16 h-16 bg-[#1a1a1a] border border-[#333333] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl overflow-hidden">
             <img 

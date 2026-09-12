@@ -172,7 +172,50 @@ A base de dados será orquestrada via schema prisma:
   - **Identificador de Página (`page.tsx`):** O componente assíncrono raiz foi renomeado de `ProjectNotesPage` para `DevLogPage`.
   - **Script de Inicialização (`iniciar.bat`):** Janela do console e mensagem de boot atualizadas para `DevLog`.
   - **Documentação do Repositório (`README.md`):** Incorporada seção formal "Sobre o Projeto" destacando a proposta de valor técnica e stack moderna.
-- **Documentação Relacionada:** [doc/09_renomeacao_unificacao_branding_devlog.md](file:///c:/Users/Filipe/Documents/Google%20Antigravity/PROJECT_NOTES/doc/09_renomeacao_unificacao_branding_devlog.md)
+- **Documentação Relacionada:** [doc/09_renomeacao_unificacao_branding_devlog.md](./doc/09_renomeacao_unificacao_branding_devlog.md)
+
+---
+
+### [2026-09-11] - Marco 10: Animações Cinematográficas com GSAP (Hero & Header Reveal)
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Implementação de transições visuais fluidas de alta fidelidade e ergonomia utilizando **GSAP** e o hook oficial `@gsap/react` (`useGSAP`), seguindo as diretrizes oficiais de animação em React 19 / Next.js.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Instalação Oficial:** Adicionados `gsap` e `@gsap/react` como dependências de produção do projeto.
+  - **Gerenciamento de Ciclo de Vida (`useGSAP` com `scope`):** Utilização de `useRef` como escopo isolado para o Welcome Hero, Header do projeto e Board de tarefas/notas, garantindo reversão automática (`ctx.revert()`) ao desmontar componentes e impedindo **Memory Leaks** (vazamento de memória).
+  - **Hero & Welcome Screen Reveal:** Transição sequencial com elasticidade suave (`back.out(1.7)`) para o badge/logo, entrada vertical fluida para títulos e stagger progressivo para os cards de atalho ("Novo Projeto" e "Ver Projetos").
+  - **Project Header & Toolbar Reveal:** Deslizamento suave da identificação do projeto e controles de visualização, associado ao efeito cascata (*stagger*) nas pílulas de filtros contextuais de tags.
+  - **Correção de Cores das Notas & `clearProps`:** Ajustado o parâmetro de finalização do GSAP para `clearProps: "transform,opacity,visibility"` (em vez de `"all"`), impedindo que o motor de animação removesse a cor de fundo inline dos post-its. Aplicados tons pastéis e harmoniosos de amarelo suave (`#fef3c7`) e âmbar claro (`#fde68a`), confortáveis visualmente e com fita adesiva fosca translúcida.
+  - **Alinhamento e Ergonomia dos Post-its:** Remoção de rotações desiguais em favor de um alinhamento limpo e simétrico em grade (`grid-cols-2`), com elevação sutil no hover.
+  - **Reordenação Dinâmica por Arraste (Drag-and-Drop):** Implementado suporte a arrastar e soltar notas adesivas (`HTML5 Drag and Drop`) com feedback visual (opacidade, anel de realce) e persistência de ordenação no `localStorage` por projeto.
+  - **Eliminação de Avisos de Console (`GSAP target not found`):** Adicionada a diretiva `gsap.config({ nullTargetWarn: false })` e condicionamento estrito por verificação de presença de nós DOM antes da invocação dos tweens.
+  - **Backdrop Unificado do Modal de Tarefa:** Elevado o índice de empilhamento (`z-index`) do modal de detalhes da tarefa de `z-[60]` para `z-[80]`, garantindo que o backdrop escuro com desfoque cubra 100% da tela (incluindo o menu lateral esquerdo `z-[70]`).
+  - **Harmonização do Botão Excluir:** Calibrado o fundo para um escuro moderado e não agressivo (`bg-black/20 hover:bg-black/30 text-red-700` no tema claro e `bg-red-950/40 hover:bg-red-950/60 text-red-400` no tema escuro), eliminando o preto sólido chapado em favor de uma integração fluida com o tema sépia.
+- **Documentação Relacionada:** [doc/10_animacoes_gsap_hero_header.md](./doc/10_animacoes_gsap_hero_header.md)
+
+---
+
+### [2026-09-11] - Marco 11: Reorganização da Busca e Categorização Unificada ("Tarefas em andamento" e "Tarefas Concluídas")
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Atendimento ao feedback de usabilidade para aproximar a barra de pesquisa das abas de navegação de status ("Pendentes" / "Concluídas") e permitir que a busca opere em nível global no projeto, particionando os resultados instantaneamente em duas seções categorizadas: *"Tarefas em andamento"* e *"Tarefas Concluídas"*.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Reposicionamento Espacial da Busca (Layout UX):** Substituída a distribuição extrema `justify-between` por alinhamento harmônico à esquerda (`justify-start gap-3 sm:gap-6 lg:gap-8`), trazendo o campo de busca para próximo das abas de status.
+  - **Mecanismo de Busca Abrangente e Reativo:** Implementada lógica via `useMemo` que avalia termos no título, descrição, tags e logs de histórico, mantendo compatibilidade com filtros de tags selecionadas.
+  - **Particionamento Categorizado de Resultados:** Quando `isSearching` é ativo, a listagem do quadro se subdivide automaticamente em:
+    - *Tarefas em andamento*: com indicador âmbar e badge de contagem de itens pendentes encontrados.
+    - *Tarefas Concluídas*: com indicador verde e badge de contagem de itens finalizados encontrados.
+  - **Componentização Limpa (`renderTaskCard`):** Modularizada a renderização dos cards de tarefas para evitar duplicidade de JSX e garantir manutenção centralizada de interações (edição, exclusão, toggle de status e logs).
+  - **Feedback para Ausência de Resultados:** Tratamento de empty states com botão contextual de limpeza de busca e preservação do fluxo convencional quando o campo de pesquisa está vazio.
+---
+
+### [2026-09-11] - Marco 12: Nova Identidade Visual e Novo Logotipo do DevLog
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Atualização do logotipo oficial do DevLog para uma identidade visual moderna, com chaves de código `{ }` em degradê neon (ciano e âmbar) envolvendo o checkmark central sobre vidro escuro fosco (*frosted glass squircle*).
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Geração e Curadoria:** Exploração de múltiplos conceitos via IA generativa e seleção da evolução refinada das chaves de código com checkmark.
+  - **Tratamento de Fundo e Transparência (Alpha Channel):** Processamento gráfico automatizado via `.NET System.Drawing` para recortar o squircle central em resolução 512x512 e aplicar máscara com cantos suaves 100% transparentes (`Alpha = 0`), eliminando o fundo preto exterior indesejado.
+  - **Padronização dos Arquivos do Sistema:** Atualizados `public/logo-devlog.png` (usado na barra lateral e tela de autenticação) e `src/app/icon.png` (favicon oficial dos metadados).
+- **Documentação Relacionada:** [doc/12_novo_logotipo_identidade_visual.md](./doc/12_novo_logotipo_identidade_visual.md)
+
+
+
+
 
 
 

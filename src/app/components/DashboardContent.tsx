@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition, useEffect, useMemo } from "react";
+import React, { useState, useTransition, useEffect, useMemo, useRef } from "react";
 import {
   CheckCircle2, Circle, Filter, Plus, LogOut,
   Trash2, Edit2, X, MessageSquare,
@@ -20,6 +20,13 @@ import { createNote, updateNote, deleteNote } from "../actions/notes";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { uploadAttachment } from "@/lib/supabase";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(useGSAP);
+  gsap.config({ nullTargetWarn: false });
+}
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -129,10 +136,203 @@ export default function DashboardContent({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [notesList, setNotesList] = useState<Note[]>(initialNotes);
+  const [draggedNoteIndex, setDraggedNoteIndex] = useState<number | null>(null);
+  const [dragOverNoteIndex, setDragOverNoteIndex] = useState<number | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [isPending, startTransition] = useTransition();
+
+  // Sincroniza e ordena as notas com base no localStorage do projeto
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setNotesList(initialNotes);
+      return;
+    }
+    const savedOrderJson = localStorage.getItem(`devlog_notes_order_${selectedProjectId}`);
+    if (savedOrderJson) {
+      try {
+        const savedOrder: string[] = JSON.parse(savedOrderJson);
+        const map = new Map(initialNotes.map(n => [n.id, n]));
+        const ordered: Note[] = [];
+        for (const id of savedOrder) {
+          const item = map.get(id);
+          if (item) {
+            ordered.push(item);
+            map.delete(id);
+          }
+        }
+        const remaining = Array.from(map.values());
+        setNotesList([...remaining, ...ordered]);
+        return;
+      } catch (e) {
+        console.error("Erro ao sincronizar ordem das notas:", e);
+      }
+    }
+    setNotesList(initialNotes);
+  }, [initialNotes, selectedProjectId]);
+
+  const handleNoteDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedNoteIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", index.toString());
+  };
+
+  const handleNoteDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverNoteIndex !== index) {
+      setDragOverNoteIndex(index);
+    }
+  };
+
+  const handleNoteDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedNoteIndex === null || draggedNoteIndex === targetIndex) {
+      setDraggedNoteIndex(null);
+      setDragOverNoteIndex(null);
+      return;
+    }
+
+    const updated = [...notesList];
+    const [movedItem] = updated.splice(draggedNoteIndex, 1);
+    updated.splice(targetIndex, 0, movedItem);
+
+    setNotesList(updated);
+    setDraggedNoteIndex(null);
+    setDragOverNoteIndex(null);
+
+    if (selectedProjectId) {
+      localStorage.setItem(
+        `devlog_notes_order_${selectedProjectId}`,
+        JSON.stringify(updated.map(n => n.id))
+      );
+    }
+  };
+
+  const handleNoteDragEnd = () => {
+    setDraggedNoteIndex(null);
+    setDragOverNoteIndex(null);
+  };
+
+  // Referências DOM e Animações GSAP (com useGSAP para ciclo de vida seguro e sem memory leaks)
+  const welcomeRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  // GSAP: Animação de Entrada do Hero / Tela de Boas-Vindas (sem projeto selecionado)
+  useGSAP(() => {
+    if (!welcomeRef.current) return;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
+    const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
+    tl.from(".welcome-badge", {
+      scale: 0.75,
+      autoAlpha: 0,
+      duration: 0.65,
+      ease: "back.out(1.7)",
+      clearProps: "transform,opacity,visibility"
+    })
+    .from(".welcome-text", {
+      y: 18,
+      autoAlpha: 0,
+      duration: 0.55,
+      clearProps: "transform,opacity,visibility"
+    }, "-=0.3")
+    .from(".welcome-card", {
+      y: 22,
+      autoAlpha: 0,
+      stagger: 0.1,
+      duration: 0.45,
+      clearProps: "transform,opacity,visibility"
+    }, "-=0.2");
+
+    const welcomeCta = welcomeRef.current.querySelector(".welcome-cta");
+    if (welcomeCta) {
+      tl.from(welcomeCta, {
+        scale: 0.9,
+        autoAlpha: 0,
+        duration: 0.45,
+        ease: "back.out(1.5)",
+        clearProps: "transform,opacity,visibility"
+      }, "-=0.1");
+    }
+  }, { scope: welcomeRef, dependencies: [selectedProjectId] });
+
+  // GSAP: Animação do Header, Tags e Barra de Abas (com projeto selecionado)
+  useGSAP(() => {
+    if (!headerRef.current || !selectedProjectId) return;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
+    const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
+    tl.from(".header-top-info", {
+      x: -16,
+      autoAlpha: 0,
+      duration: 0.4,
+      clearProps: "transform,opacity,visibility"
+    })
+    .from(".header-top-controls", {
+      x: 16,
+      autoAlpha: 0,
+      duration: 0.4,
+      clearProps: "transform,opacity,visibility"
+    }, "<");
+
+    const tagPills = headerRef.current.querySelectorAll(".header-tag-pill");
+    if (tagPills.length > 0) {
+      tl.from(tagPills, {
+        y: 8,
+        autoAlpha: 0,
+        stagger: 0.03,
+        duration: 0.3,
+        clearProps: "transform,opacity,visibility"
+      }, "-=0.15");
+    }
+
+    const statusTabs = headerRef.current.querySelectorAll(".header-status-tabs");
+    if (statusTabs.length > 0) {
+      tl.from(statusTabs, {
+        y: 6,
+        autoAlpha: 0,
+        duration: 0.3,
+        clearProps: "transform,opacity,visibility"
+      }, "-=0.15");
+    }
+  }, { scope: headerRef, dependencies: [selectedProjectId] });
+
+  // GSAP: Animação suave e com stagger dos Cards de Tarefas e Post-its ao trocar filtros ou projeto
+  useGSAP(() => {
+    if (!boardRef.current || !selectedProjectId) return;
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (prefersReducedMotion) return;
+
+    const taskCards = boardRef.current.querySelectorAll(".task-card-item");
+    if (taskCards.length > 0) {
+      gsap.from(taskCards, {
+        y: 12,
+        autoAlpha: 0,
+        stagger: 0.035,
+        duration: 0.35,
+        ease: "power2.out",
+        clearProps: "transform,opacity,visibility"
+      });
+    }
+
+    const noteCards = boardRef.current.querySelectorAll(".note-card-item");
+    if (noteCards.length > 0) {
+      gsap.from(noteCards, {
+        scale: 0.96,
+        autoAlpha: 0,
+        stagger: 0.045,
+        duration: 0.35,
+        ease: "power2.out",
+        clearProps: "transform,opacity,visibility"
+      });
+    }
+  }, { scope: boardRef, dependencies: [selectedProjectId, statusFilter, selectedTag] });
 
   // Estados de Configurações e Troca de Senha
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -321,20 +521,43 @@ export default function DashboardContent({
   };
 
 
-  // Filtrar tarefas por tag, status e busca
-  const tasks = initialTasks.filter(t => {
-    const matchesTag = !selectedTag || t.tags.some(tag => tag.trim().toUpperCase() === selectedTag.trim().toUpperCase());
-    const matchesStatus = t.status === statusFilter;
-    
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = !searchQuery || 
-      t.title.toLowerCase().includes(query) ||
-      (t.description || "").toLowerCase().includes(query) ||
-      t.logs.some(l => l.content.toLowerCase().includes(query)) ||
-      t.tags.some(tag => tag.toLowerCase().includes(query));
+  const isSearching = searchQuery.trim().length > 0;
 
-    return matchesTag && matchesStatus && matchesSearch;
-  });
+  // Busca em todas as tarefas (em andamento e concluídas) quando há pesquisa ativa
+  const searchMatchingTasks = useMemo(() => {
+    if (!isSearching) return [];
+    const query = searchQuery.toLowerCase().trim();
+    return initialTasks.filter(t => {
+      const matchesTag = !selectedTag || t.tags.some(tag => tag.trim().toUpperCase() === selectedTag.trim().toUpperCase());
+      const matchesQuery = 
+        t.title.toLowerCase().includes(query) ||
+        (t.description || "").toLowerCase().includes(query) ||
+        t.logs.some(l => l.content.toLowerCase().includes(query)) ||
+        t.tags.some(tag => tag.toLowerCase().includes(query));
+
+      return matchesTag && matchesQuery;
+    });
+  }, [initialTasks, searchQuery, isSearching, selectedTag]);
+
+  // Separação das tarefas pesquisadas em categorias: "Tarefas em andamento" e "Tarefas Concluídas"
+  const inProgressSearchTasks = useMemo(() => {
+    return searchMatchingTasks.filter(t => t.status !== "completed");
+  }, [searchMatchingTasks]);
+
+  const completedSearchTasks = useMemo(() => {
+    return searchMatchingTasks.filter(t => t.status === "completed");
+  }, [searchMatchingTasks]);
+
+  // Tarefas normais quando não está em modo de pesquisa (filtradas por tag e status ativo)
+  const normalTasks = useMemo(() => {
+    return initialTasks.filter(t => {
+      const matchesTag = !selectedTag || t.tags.some(tag => tag.trim().toUpperCase() === selectedTag.trim().toUpperCase());
+      const matchesStatus = t.status === statusFilter;
+      return matchesTag && matchesStatus;
+    });
+  }, [initialTasks, selectedTag, statusFilter]);
+
+  const tasks = isSearching ? searchMatchingTasks : normalTasks;
 
   const handleSelectProject = (id: string) => {
     startTransition(() => {
@@ -606,6 +829,137 @@ export default function DashboardContent({
     );
   };
 
+  const renderTaskCard = (task: Task) => {
+    const lastLog = task.logs[task.logs.length - 1];
+    const logCount = task.logs.length;
+
+    return (
+      <div
+        key={task.id}
+        onClick={() => setSelectedTaskId(task.id)}
+        className={cn(
+          "task-card-item bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden shadow-lg transition-all duration-300 group cursor-pointer hover:bg-[var(--surface-hover)] relative w-full min-w-0",
+          task.status === "completed" ? "opacity-60" : "",
+          viewMode === 'list' ? "p-3" : "p-3.5 sm:p-4"
+        )}
+        style={{
+          borderLeft: `3px solid ${task.status === 'completed' ? '#444' : (theme === 'light' ? 'var(--accent)' : selectedProject?.color || 'var(--accent)')}`,
+        }}
+      >
+        {/* Efeito de brilho no hover */}
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none"
+          style={{ background: `radial-gradient(circle at center, ${theme === 'light' ? 'var(--accent)' : selectedProject?.color || 'var(--accent)'}, transparent 70%)` }}
+        />
+        <div className={cn("flex items-start w-full min-w-0", viewMode === 'list' ? "gap-2.5 sm:gap-3" : "gap-3 sm:gap-4")}>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleToggleTask(task); }}
+            className={cn("flex-shrink-0 transition-colors", 
+              viewMode === 'list' ? "mt-0.5" : "mt-1",
+              task.status === "completed" ? "text-emerald-500" : "text-[#555] hover:text-[var(--accent)]"
+            )}
+          >
+            {task.status === "completed" ? <CheckCircle2 size={viewMode === 'list' ? 18 : 20} /> : <Circle size={viewMode === 'list' ? 18 : 20} />}
+          </button>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 sm:gap-4 w-full min-w-0">
+              <div className={cn(
+                "flex-1 min-w-0 font-semibold leading-tight break-words [overflow-wrap:anywhere]", 
+                task.status === "completed" ? "text-[#888] line-through" : "text-[var(--foreground)]",
+                viewMode === 'list' ? "text-sm" : "text-base sm:text-lg mb-1"
+              )}>
+                {viewMode === 'list' ? task.title : renderContent(task.title, task.attachments)}
+              </div>
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); openEditTask(task); }} 
+                  className="p-1.5 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--accent)]/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
+                  title="Editar tarefa"
+                >
+                  <Edit2 size={13} />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} 
+                  className="p-1.5 text-[#888] hover:text-red-500 hover:bg-red-600/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
+                  title="Excluir tarefa"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+
+            {viewMode === 'card' && task.description && (
+              <p className="text-xs text-[var(--foreground)] opacity-70 line-clamp-2 leading-relaxed font-medium break-words [overflow-wrap:anywhere]">
+                {task.description}
+              </p>
+            )}
+
+            {viewMode === 'card' && lastLog && (
+              <div className="mt-2 flex items-center gap-2 text-[#888] min-w-0">
+                <MessageSquare size={12} className="flex-shrink-0" />
+                <p className="text-xs truncate italic break-all">
+                  {lastLog.content.replace(/!\[.*?\]\(.*?\)/g, "[Anexo]")}
+                </p>
+              </div>
+            )}
+
+            <div className={cn("flex items-center justify-between gap-2", viewMode === 'list' ? "mt-1.5" : "mt-3")}>
+              <div className="flex items-center gap-1.5 overflow-hidden">
+                {task.attachments.length > 0 && viewMode === 'list' && (
+                  <span title="Possui anexos">
+                    <Plus size={12} className="text-[var(--accent)]" />
+                  </span>
+                )}
+                {task.tags.map(tag => {
+                  const tagColor = getTagColor(tag);
+                  return (
+                    <span
+                      key={tag}
+                      className={cn(
+                        "font-black rounded-full uppercase border transition-all truncate",
+                        viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-2 py-0.5 text-[9px] sm:text-[10px]"
+                      )}
+                      style={{
+                        backgroundColor: `${tagColor}15`,
+                        color: tagColor,
+                        borderColor: `${tagColor}40`
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <span
+                  className={cn(
+                    "font-bold uppercase tracking-widest flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded border transition-all",
+                    viewMode === 'list' 
+                      ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)] shadow-sm" 
+                      : "text-[9px] sm:text-[10px]"
+                  )}
+                  style={{ 
+                    color: logCount > 0 ? (theme === 'light' ? 'var(--accent)' : (selectedProject?.color || 'var(--accent)')) : '#666',
+                    borderColor: logCount > 0 ? (theme === 'light' ? 'var(--accent)40' : `${selectedProject?.color || 'var(--accent)'}40`) : 'transparent'
+                  }}
+                >
+                  <MessageSquare size={10} /> {logCount}
+                </span>
+                <span className={cn(
+                  "font-bold text-[var(--accent)] bg-[var(--accent)]/10 rounded border border-[var(--accent)]/20 shadow-sm",
+                  viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px]"
+                )}>
+                  {new Date(task.createdAt).toLocaleDateString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
 
   return (
     <div className="flex h-[100dvh] w-full bg-[var(--background)] text-[var(--foreground)] overflow-hidden selection:bg-[var(--accent)]/30 transition-colors duration-300">
@@ -778,9 +1132,9 @@ export default function DashboardContent({
       <main className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden bg-[var(--background)] transition-colors duration-300">
         {selectedProject ? (
           <>
-            <header className="border-b border-[var(--border)] flex flex-col px-3 sm:px-4 lg:px-8 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40 w-full min-w-0 max-w-full">
+            <header ref={headerRef} className="border-b border-[var(--border)] flex flex-col px-3 sm:px-4 lg:px-8 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40 w-full min-w-0 max-w-full">
               <div className="h-14 sm:h-16 lg:h-20 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                <div className="header-top-info flex items-center gap-2 sm:gap-4 min-w-0">
                   <button
                     onClick={() => setIsSidebarOpen(true)}
                     className="lg:hidden p-2 -ml-1 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-xl transition-all"
@@ -808,7 +1162,7 @@ export default function DashboardContent({
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0">
+                <div className="header-top-controls flex items-center gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0">
                   <div className="flex items-center bg-[var(--surface)] border border-[var(--border)] rounded-xl p-0.5 sm:p-1 shadow-sm">
                     <button
                       onClick={() => handleToggleViewMode('card')}
@@ -874,7 +1228,7 @@ export default function DashboardContent({
                   {contextualTagsWithCount.map(({ name: tag, count }) => {
                     const tagColor = getTagColor(tag);
                     return (
-                      <div key={tag} className="relative group flex-shrink-0">
+                      <div key={tag} className="header-tag-pill relative group flex-shrink-0">
                         <button
                           onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
                           className={cn(
@@ -922,8 +1276,8 @@ export default function DashboardContent({
               )}
 
               {/* Status Tabs and Search */}
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 border-t border-[var(--border)]/40 w-full min-w-0">
-                <div className="flex items-center gap-6 flex-shrink-0">
+              <div className="header-status-tabs py-2.5 flex flex-col sm:flex-row sm:items-center justify-start gap-3 sm:gap-6 lg:gap-8 border-t border-[var(--border)]/40 w-full min-w-0">
+                <div className="flex items-center gap-5 sm:gap-6 flex-shrink-0">
                   <button
                     onClick={() => setStatusFilter("pending")}
                     className={cn(
@@ -965,8 +1319,8 @@ export default function DashboardContent({
                   </button>
                 </div>
 
-                {/* Busca */}
-                <div className="relative group w-full sm:w-64 lg:w-80 min-w-0">
+                {/* Busca - posicionada mais para a esquerda, logo ao lado das abas */}
+                <div className="relative group w-full sm:w-72 lg:w-80 min-w-0">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#666] group-focus-within:text-[var(--accent)] transition-colors">
                     <Search size={14} />
                   </div>
@@ -1025,13 +1379,13 @@ export default function DashboardContent({
                     "text-[10px] font-black px-1.5 py-0.5 rounded-md flex-shrink-0",
                     mobileTab === 'notes' ? "bg-amber-400/20 text-amber-400" : "bg-black/20 text-[#666]"
                   )}>
-                    {initialNotes.length}
+                    {notesList.length}
                   </span>
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-8 bg-[var(--background)] w-full min-w-0">
+            <div ref={boardRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 lg:p-8 bg-[var(--background)] w-full min-w-0">
               <div className="max-w-[1700px] w-full min-w-0 mx-auto grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-10 h-full">
                 {/* COLUNA ESQUERDA: TAREFAS */}
                 <div className={cn(
@@ -1052,141 +1406,84 @@ export default function DashboardContent({
                         <Plus size={14} strokeWidth={3} /> Nova Tarefa
                       </button>
                     </div>
-                    {tasks.length === 0 ? (
-                      <div className="text-center py-20 opacity-40 text-sm font-medium">Nenhuma tarefa encontrada neste filtro.</div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-3 sm:gap-4 w-full min-w-0">
-                        {tasks.map((task) => {
-                          const lastLog = task.logs[task.logs.length - 1];
-                          const logCount = task.logs.length;
-
-                          return (
-                            <div
-                              key={task.id}
-                              onClick={() => setSelectedTaskId(task.id)}
-                              className={cn(
-                                "bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden shadow-lg transition-all duration-300 group cursor-pointer hover:bg-[var(--surface-hover)] relative w-full min-w-0",
-                                task.status === "completed" ? "opacity-60" : "",
-                                viewMode === 'list' ? "p-3" : "p-3.5 sm:p-4"
-                              )}
-                              style={{
-                                borderLeft: `3px solid ${task.status === 'completed' ? '#444' : (theme === 'light' ? 'var(--accent)' : selectedProject.color)}`,
-                              }}
-                            >
-                              {/* Efeito de brilho no hover */}
-                              <div
-                                className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none"
-                                style={{ background: `radial-gradient(circle at center, ${theme === 'light' ? 'var(--accent)' : selectedProject.color}, transparent 70%)` }}
-                              />
-                              <div className={cn("flex items-start w-full min-w-0", viewMode === 'list' ? "gap-2.5 sm:gap-3" : "gap-3 sm:gap-4")}>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleToggleTask(task); }}
-                                  className={cn("flex-shrink-0 transition-colors", 
-                                    viewMode === 'list' ? "mt-0.5" : "mt-1",
-                                    task.status === "completed" ? "text-emerald-500" : "text-[#555] hover:text-[var(--accent)]"
-                                  )}
-                                >
-                                  {task.status === "completed" ? <CheckCircle2 size={viewMode === 'list' ? 18 : 20} /> : <Circle size={viewMode === 'list' ? 18 : 20} />}
-                                </button>
-
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-2 sm:gap-4 w-full min-w-0">
-                                    <div className={cn(
-                                      "flex-1 min-w-0 font-semibold leading-tight break-words [overflow-wrap:anywhere]", 
-                                      task.status === "completed" ? "text-[#888] line-through" : "text-[var(--foreground)]",
-                                      viewMode === 'list' ? "text-sm" : "text-base sm:text-lg mb-1"
-                                    )}>
-                                      {viewMode === 'list' ? task.title : renderContent(task.title, task.attachments)}
-                                    </div>
-                                    <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); openEditTask(task); }} 
-                                        className="p-1.5 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--accent)]/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
-                                        title="Editar tarefa"
-                                      >
-                                        <Edit2 size={13} />
-                                      </button>
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} 
-                                        className="p-1.5 text-[#888] hover:text-red-500 hover:bg-red-600/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
-                                        title="Excluir tarefa"
-                                      >
-                                        <Trash2 size={13} />
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {viewMode === 'card' && task.description && (
-                                    <p className="text-xs text-[var(--foreground)] opacity-70 line-clamp-2 leading-relaxed font-medium break-words [overflow-wrap:anywhere]">
-                                      {task.description}
-                                    </p>
-                                  )}
-
-                                  {viewMode === 'card' && lastLog && (
-                                    <div className="mt-2 flex items-center gap-2 text-[#888] min-w-0">
-                                      <MessageSquare size={12} className="flex-shrink-0" />
-                                      <p className="text-xs truncate italic break-all">
-                                        {lastLog.content.replace(/!\[.*?\]\(.*?\)/g, "[Anexo]")}
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  <div className={cn("flex items-center justify-between gap-2", viewMode === 'list' ? "mt-1.5" : "mt-3")}>
-                                    <div className="flex items-center gap-1.5 overflow-hidden">
-                                      {task.attachments.length > 0 && viewMode === 'list' && (
-                                        <span title="Possui anexos">
-                                          <Plus size={12} className="text-[var(--accent)]" />
-                                        </span>
-                                      )}
-                                      {task.tags.map(tag => {
-                                        const tagColor = getTagColor(tag);
-                                        return (
-                                          <span
-                                            key={tag}
-                                            className={cn(
-                                              "font-black rounded-full uppercase border transition-all truncate",
-                                              viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-2 py-0.5 text-[9px] sm:text-[10px]"
-                                            )}
-                                            style={{
-                                              backgroundColor: `${tagColor}15`,
-                                              color: tagColor,
-                                              borderColor: `${tagColor}40`
-                                            }}
-                                          >
-                                            {tag}
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                    <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                                      <span
-                                        className={cn(
-                                          "font-bold uppercase tracking-widest flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded border transition-all",
-                                          viewMode === 'list' 
-                                            ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)] shadow-sm" 
-                                            : "text-[9px] sm:text-[10px]"
-                                        )}
-                                        style={{ 
-                                          color: logCount > 0 ? (theme === 'light' ? 'var(--accent)' : selectedProject.color) : '#666',
-                                          borderColor: logCount > 0 ? (theme === 'light' ? 'var(--accent)40' : `${selectedProject.color}40`) : 'transparent'
-                                        }}
-                                      >
-                                        <MessageSquare size={10} /> {logCount}
-                                      </span>
-                                      <span className={cn(
-                                        "font-bold text-[var(--accent)] bg-[var(--accent)]/10 rounded border border-[var(--accent)]/20 shadow-sm",
-                                        viewMode === 'list' ? "px-1.5 py-0 text-[8px]" : "px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px]"
-                                      )}>
-                                        {new Date(task.createdAt).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
+                    {isSearching ? (
+                      /* MODO DE BUSCA ATIVA: CATEGORIAS SEPARADAS */
+                      searchMatchingTasks.length === 0 ? (
+                        <div className="text-center py-16 bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6">
+                          <div className="w-12 h-12 rounded-full bg-[var(--border)]/50 flex items-center justify-center mx-auto mb-3 text-[#777]">
+                            <Search size={20} />
+                          </div>
+                          <p className="text-sm font-bold text-[var(--foreground)]">Nenhuma tarefa encontrada</p>
+                          <p className="text-xs text-[#888] mt-1">Nenhum resultado para "{searchQuery}".</p>
+                          <button
+                            onClick={() => setSearchQuery("")}
+                            className="mt-4 px-4 py-1.5 text-xs font-bold bg-[var(--accent)] text-[var(--background)] rounded-xl hover:opacity-90 transition-opacity"
+                          >
+                            Limpar pesquisa
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-6 sm:space-y-8 w-full min-w-0">
+                          {/* Categoria 1: Tarefas em andamento */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]/60">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]" />
+                                <h4 className="text-xs font-black uppercase tracking-wider text-[var(--accent)]">
+                                  Tarefas em andamento
+                                </h4>
+                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-[var(--accent)]/15 text-[var(--accent)]">
+                                  {inProgressSearchTasks.length}
+                                </span>
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+
+                            {inProgressSearchTasks.length === 0 ? (
+                              <div className="p-4 bg-[var(--surface)]/40 border border-dashed border-[var(--border)]/60 rounded-xl text-center text-xs text-[#777]">
+                                Nenhuma tarefa em andamento encontrada.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-3 sm:gap-4 w-full min-w-0">
+                                {inProgressSearchTasks.map(task => renderTaskCard(task))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Categoria 2: Tarefas Concluídas */}
+                          <div className="space-y-3 pt-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-[var(--border)]/60">
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-[var(--status-completed)]" />
+                                <h4 className="text-xs font-black uppercase tracking-wider text-[var(--status-completed)]">
+                                  Tarefas Concluídas
+                                </h4>
+                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-[var(--status-completed-bg)] text-[var(--status-completed)]">
+                                  {completedSearchTasks.length}
+                                </span>
+                              </div>
+                            </div>
+
+                            {completedSearchTasks.length === 0 ? (
+                              <div className="p-4 bg-[var(--surface)]/40 border border-dashed border-[var(--border)]/60 rounded-xl text-center text-xs text-[#777]">
+                                Nenhuma tarefa concluída encontrada.
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-1 gap-3 sm:gap-4 w-full min-w-0">
+                                {completedSearchTasks.map(task => renderTaskCard(task))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    ) : (
+                      /* MODO NORMAL: LISTA POR STATUS ATIVO */
+                      tasks.length === 0 ? (
+                        <div className="text-center py-20 opacity-40 text-sm font-medium">Nenhuma tarefa encontrada neste filtro.</div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3 sm:gap-4 w-full min-w-0">
+                          {tasks.map(task => renderTaskCard(task))}
+                        </div>
+                      )
                     )}
                   </div>
                 </div>
@@ -1208,61 +1505,82 @@ export default function DashboardContent({
                     </div>
 
                     {/* Grid de Notas (Bloquinhos) */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-8 p-1 sm:p-2">
-                      {initialNotes.length === 0 ? (
-                        <div className="col-span-full py-24 text-center opacity-10 flex flex-col items-center gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 p-1 sm:p-2">
+                      {notesList.length === 0 ? (
+                        <div className="col-span-full py-24 text-center opacity-20 flex flex-col items-center gap-4">
                           <Plus size={48} strokeWidth={1} />
                           <p className="text-[10px] font-black uppercase tracking-[0.5em]">Nenhuma nota</p>
                         </div>
                       ) : (
-                        initialNotes.map((note, idx) => (
-                          <div
-                            key={note.id}
-                            className={cn(
-                              "p-5 sm:p-8 shadow-[10px_10px_20px_rgba(0,0,0,0.5)] relative transition-all group hover:-translate-y-3 hover:shadow-[20px_20px_40px_rgba(0,0,0,0.6)] flex flex-col",
-                              idx % 3 === 0 ? "sm:-rotate-2 rotate-0" : idx % 3 === 1 ? "sm:rotate-1 rotate-0" : "sm:rotate-2 rotate-0",
-                              "border-t-[18px] sm:border-t-[25px] border-amber-200/30"
-                            )}
-                            style={{
-                              backgroundColor: idx % 2 === 0 ? '#fef3c7' : '#fde68a',
-                              minHeight: '200px'
-                            }}
-                          >
-                            {/* Efeito de fita adesiva */}
-                            <div className="absolute -top-4 sm:-top-5 left-1/2 -translate-x-1/2 w-14 sm:w-16 h-6 sm:h-8 bg-white/20 backdrop-blur-[1px] -rotate-1 border border-white/10" />
+                        notesList.map((note, idx) => {
+                          // Amarelos suaves e equilibrados de post-it clássico (confortáveis aos olhos)
+                          const isNoteSoftYellow = idx % 2 === 0;
+                          const noteBg = isNoteSoftYellow ? '#fef3c7' : '#fde68a';
+                          const isBeingDragged = draggedNoteIndex === idx;
+                          const isDragTarget = dragOverNoteIndex === idx;
 
-                            {editingNoteId === note.id ? (
-                              <div className="flex-1 flex flex-col">
-                                <textarea
-                                  autoFocus
-                                  className="flex-1 w-full bg-transparent border-none outline-none text-amber-950 text-[15px] font-bold resize-none leading-relaxed"
-                                  value={editingNoteContent}
-                                  onChange={(e) => setEditingNoteContent(e.target.value)}
-                                />
-                                <div className="flex justify-end gap-3 mt-4 sm:mt-6">
-                                  <button onClick={() => setEditingNoteId(null)} className="text-[10px] font-black uppercase text-amber-900/40 hover:text-amber-900 transition-colors">Sair</button>
-                                  <button onClick={() => handleUpdateNote(note.id)} className="px-4 py-2 bg-amber-950 text-[#fef3c7] text-[10px] font-black uppercase rounded shadow-xl hover:bg-black transition-all">Salvar</button>
-                                </div>
+                          return (
+                            <div
+                              key={note.id}
+                              draggable={!editingNoteId}
+                              onDragStart={(e) => handleNoteDragStart(e, idx)}
+                              onDragOver={(e) => handleNoteDragOver(e, idx)}
+                              onDrop={(e) => handleNoteDrop(e, idx)}
+                              onDragEnd={handleNoteDragEnd}
+                              className={cn(
+                                "note-card-item p-5 sm:p-7 relative transition-all duration-200 group flex flex-col rounded-sm cursor-grab active:cursor-grabbing select-none",
+                                "shadow-[0_10px_25px_-5px_rgba(0,0,0,0.25),0_8px_10px_-6px_rgba(0,0,0,0.18)] hover:shadow-[0_18px_36px_-6px_rgba(0,0,0,0.35)]",
+                                "hover:-translate-y-1.5",
+                                "border-t-[18px] sm:border-t-[22px] border-amber-200/60",
+                                isBeingDragged ? "opacity-30 scale-95 ring-2 ring-amber-400" : "",
+                                isDragTarget ? "ring-2 ring-amber-500 scale-[1.02]" : ""
+                              )}
+                              style={{
+                                backgroundColor: noteBg,
+                                minHeight: '210px'
+                              }}
+                            >
+                              {/* Efeito de fita adesiva clássica e indicador de arraste */}
+                              <div 
+                                className="absolute -top-3.5 sm:-top-4 left-1/2 -translate-x-1/2 w-16 sm:w-20 h-5 sm:h-6 bg-white/45 backdrop-blur-[2px] border border-white/30 shadow-sm flex items-center justify-center pointer-events-none rounded-[1px]"
+                                title="Arraste para trocar de posição"
+                              >
+                                <div className="w-6 h-1 border-y border-amber-950/25" />
                               </div>
-                            ) : (
-                              <>
-                                <div className="absolute top-2 right-2 flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all z-20">
-                                  <button onClick={() => { setEditingNoteId(note.id); setEditingNoteContent(note.content); }} className="p-1.5 bg-black/10 rounded-lg text-amber-950 hover:text-amber-900 transition-colors" title="Editar nota"><Edit2 size={13} /></button>
-                                  <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 bg-black/10 rounded-lg text-amber-950 hover:text-red-700 transition-colors" title="Excluir nota"><Trash2 size={13} /></button>
+
+                              {editingNoteId === note.id ? (
+                                <div className="flex-1 flex flex-col" onClick={(e) => e.stopPropagation()}>
+                                  <textarea
+                                    autoFocus
+                                    className="flex-1 w-full bg-transparent border-none outline-none text-amber-950 text-[15px] font-bold resize-none leading-relaxed placeholder-amber-950/40"
+                                    value={editingNoteContent}
+                                    onChange={(e) => setEditingNoteContent(e.target.value)}
+                                  />
+                                  <div className="flex justify-end gap-3 mt-4 sm:mt-6">
+                                    <button onClick={() => setEditingNoteId(null)} className="text-[10px] font-black uppercase text-amber-900/50 hover:text-amber-900 transition-colors">Sair</button>
+                                    <button onClick={() => handleUpdateNote(note.id)} className="px-4 py-2 bg-amber-950 text-[#fef3c7] text-[10px] font-black uppercase rounded shadow-xl hover:bg-black transition-all">Salvar</button>
+                                  </div>
                                 </div>
-                                <div className="text-[15px] sm:text-[16px] text-amber-950 leading-relaxed whitespace-pre-wrap font-bold flex-1 pt-1">
-                                  {note.content}
-                                </div>
-                                <div className="mt-6 sm:mt-8 pt-3 sm:pt-4 border-t border-amber-950/5 flex items-center justify-between text-amber-950/70">
-                                  <span className="text-[9px] font-black uppercase tracking-[0.2em]">
-                                    {new Date(note.createdAt).toLocaleDateString()}
-                                  </span>
-                                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        ))
+                              ) : (
+                                <>
+                                  <div className="absolute top-2 right-2 flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all z-20" onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => { setEditingNoteId(note.id); setEditingNoteContent(note.content); }} className="p-1.5 bg-black/10 hover:bg-black/20 rounded-lg text-amber-950 hover:text-amber-900 transition-colors" title="Editar nota"><Edit2 size={13} /></button>
+                                    <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 bg-black/10 hover:bg-red-500/20 rounded-lg text-amber-950 hover:text-red-700 transition-colors" title="Excluir nota"><Trash2 size={13} /></button>
+                                  </div>
+                                  <div className="text-[15px] sm:text-[16px] text-amber-950 leading-relaxed whitespace-pre-wrap font-bold flex-1 pt-1 break-words">
+                                    {note.content}
+                                  </div>
+                                  <div className="mt-6 sm:mt-8 pt-3 sm:pt-4 border-t border-amber-950/15 flex items-center justify-between text-amber-950/70">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">
+                                      {new Date(note.createdAt).toLocaleDateString()}
+                                    </span>
+                                    <div className="w-2 h-2 rounded-full bg-amber-500/80 shadow-sm" />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -1282,15 +1600,15 @@ export default function DashboardContent({
               </button>
               <h1 className="ml-4 text-lg font-bold text-[var(--foreground)] tracking-tight">DevLog</h1>
             </header>
-            <div className="flex-1 flex items-center justify-center bg-[var(--background)] p-4 sm:p-8">
-            <div className="max-w-md w-full text-center space-y-6 sm:space-y-8 animate-in fade-in zoom-in duration-500">
-              <div className="relative inline-block">
+            <div ref={welcomeRef} className="flex-1 flex items-center justify-center bg-[var(--background)] p-4 sm:p-8">
+            <div className="max-w-md w-full text-center space-y-6 sm:space-y-8">
+              <div className="welcome-badge relative inline-block">
                 <div className="absolute inset-0 bg-[var(--accent)]/20 blur-3xl rounded-full" />
                 <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-[var(--surface)] border border-[var(--border)] rounded-[24px] sm:rounded-[32px] flex items-center justify-center mx-auto shadow-2xl mb-4 sm:mb-6">
                   <LayoutGrid size={36} className="text-[var(--accent)]" />
                 </div>
               </div>
-              <div>
+              <div className="welcome-text">
                 <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] mb-2 sm:mb-3 tracking-tight">DevLog</h2>
                 <p className="text-xs sm:text-sm text-[#888] font-medium leading-relaxed">
                   Bem-vindo de volta! Selecione um projeto na barra lateral para gerenciar suas tarefas e notas, ou crie um novo workspace.
@@ -1299,7 +1617,7 @@ export default function DashboardContent({
               <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                 <div 
                   onClick={() => setIsProjectModalOpen(true)}
-                  className="p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
+                  className="welcome-card p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
                     <Plus size={18} className="text-[var(--accent)]" />
@@ -1309,7 +1627,7 @@ export default function DashboardContent({
                 </div>
                 <div 
                   onClick={() => setIsSidebarOpen(true)}
-                  className="p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
+                  className="welcome-card p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
                 >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
                     <Search size={18} className="text-emerald-500" />
@@ -1322,7 +1640,7 @@ export default function DashboardContent({
               {initialProjects.length === 0 && (
                 <button
                   onClick={() => setIsProjectModalOpen(true)}
-                  className="mt-6 sm:mt-8 px-6 sm:px-8 py-3.5 sm:py-4 bg-[var(--accent)] text-[var(--background)] font-black uppercase text-xs rounded-2xl shadow-[0_10px_20px_var(--accent-30)] hover:scale-105 active:scale-95 transition-all tracking-widest"
+                  className="welcome-cta mt-6 sm:mt-8 px-6 sm:px-8 py-3.5 sm:py-4 bg-[var(--accent)] text-[var(--background)] font-black uppercase text-xs rounded-2xl shadow-[0_10px_20px_var(--accent-30)] hover:scale-105 active:scale-95 transition-all tracking-widest"
                 >
                   Começar Agora
                 </button>
@@ -1335,8 +1653,8 @@ export default function DashboardContent({
 
       {/* DETALHE DA TAREFA (OVERLAY) */}
       {selectedTaskForDetail && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-10">
-          <div className="absolute inset-0 bg-[var(--backdrop,black)]/85 backdrop-blur-md" onClick={() => setSelectedTaskId(null)} />
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-10">
+          <div className="absolute inset-0 bg-black/70 dark:bg-black/85 backdrop-blur-md transition-opacity" onClick={() => setSelectedTaskId(null)} />
           <div className="relative w-full max-w-4xl h-[92vh] sm:h-auto sm:max-h-[90vh] bg-[var(--surface)] border-t sm:border border-[var(--border)] rounded-t-[28px] sm:rounded-[32px] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden scale-in-center">
             <header className="h-14 sm:h-16 lg:h-20 border-b border-[var(--border)] px-3 sm:px-6 lg:px-8 flex items-center justify-between flex-shrink-0 bg-[var(--sidebar)]">
               <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -1352,7 +1670,7 @@ export default function DashboardContent({
               <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0">
                 <button 
                   onClick={() => openEditTask(selectedTaskForDetail)} 
-                  className="p-2 sm:px-3 sm:py-2 bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-xs sm:text-sm font-bold rounded-lg border border-[var(--border)] flex items-center gap-1.5 text-[#888] hover:text-[var(--foreground)] transition-all" 
+                  className="p-2 sm:px-3 sm:py-2 bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-xs sm:text-sm font-bold rounded-lg border border-[var(--border)] flex items-center gap-1.5 text-[#888] hover:text-[var(--foreground)] transition-all shadow-sm active:scale-95" 
                   title="Editar Tarefa"
                 >
                   <Edit2 size={13} /> <span className="hidden sm:inline">Editar</span>
@@ -1364,10 +1682,22 @@ export default function DashboardContent({
                       setSelectedTaskId(null);
                     }
                   }} 
-                  className="p-2 sm:px-3 sm:py-2 bg-red-500/10 hover:bg-red-500/20 text-xs sm:text-sm font-bold rounded-lg border border-red-500/20 flex items-center gap-1.5 text-red-400 transition-all" 
+                  className={cn(
+                    "p-2 sm:px-3 sm:py-2 text-xs sm:text-sm font-bold rounded-lg border flex items-center gap-1.5 transition-all shadow-sm active:scale-95 group",
+                    theme === 'light'
+                      ? "bg-black/20 hover:bg-black/30 border-red-600/35 text-red-700 hover:text-red-800"
+                      : "bg-red-950/40 hover:bg-red-950/60 border-red-500/40 text-red-400 hover:text-red-300"
+                  )}
                   title="Excluir Tarefa"
                 >
-                  <Trash2 size={13} /> <span className="hidden sm:inline">Excluir</span>
+                  <Trash2 
+                    size={14} 
+                    className={cn(
+                      "transition-colors",
+                      theme === 'light' ? "text-red-700 group-hover:text-red-800" : "text-red-400 group-hover:text-red-300"
+                    )} 
+                  /> 
+                  <span className="hidden sm:inline">Excluir</span>
                 </button>
                 <button
                   onClick={() => { handleToggleTask(selectedTaskForDetail); setSelectedTaskId(null); }}
