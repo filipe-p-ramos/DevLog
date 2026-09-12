@@ -23,6 +23,14 @@ import { uploadAttachment } from "@/lib/supabase";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import DevLogLogo from "./DevLogLogo";
+import {
+  animateNoteEntrance,
+  animateTaskEntrance,
+  animateItemUpdate,
+  animateItemExit,
+  animateLogEntrance,
+  animateTaskToggle
+} from "@/lib/motion";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(useGSAP);
@@ -426,28 +434,58 @@ export default function DashboardContent({
     localStorage.setItem('viewMode', mode);
   };
 
+  // Rastreia e anima notas recém-criadas com a física expressiva do post-it
+  const prevNoteIdsRef = useRef<Set<string>>(new Set(initialNotes.map(n => n.id)));
+  useEffect(() => {
+    const currentIds = new Set(initialNotes.map(n => n.id));
+    const newNote = initialNotes.find(n => !prevNoteIdsRef.current.has(n.id));
+    if (newNote) {
+      setTimeout(() => {
+        const el = document.getElementById(`note-card-${newNote.id}`);
+        if (el) animateNoteEntrance(el);
+      }, 80);
+    }
+    prevNoteIdsRef.current = currentIds;
+  }, [initialNotes]);
+
   const handleCreateNote = () => {
     if (!newNoteContent || !selectedProjectId) return;
+    const content = newNoteContent;
     startTransition(async () => {
-      await createNote(selectedProjectId, newNoteContent);
+      await createNote(selectedProjectId, content);
       setNewNoteContent("");
+      setIsNoteModalOpen(false);
     });
   };
 
   const handleUpdateNote = (id: string) => {
     if (!editingNoteContent) return;
+    const content = editingNoteContent;
     startTransition(async () => {
-      await updateNote(id, editingNoteContent);
+      await updateNote(id, content);
       setEditingNoteId(null);
       setEditingNoteContent("");
+      setTimeout(() => {
+        const el = document.getElementById(`note-card-${id}`);
+        if (el) animateItemUpdate(el, '#f59e0b');
+      }, 50);
     });
   };
 
   const handleDeleteNote = (id: string) => {
     if (!confirm("Excluir esta nota?")) return;
-    startTransition(async () => {
-      await deleteNote(id);
-    });
+    const el = document.getElementById(`note-card-${id}`);
+    if (el) {
+      animateItemExit(el, () => {
+        startTransition(async () => {
+          await deleteNote(id);
+        });
+      });
+    } else {
+      startTransition(async () => {
+        await deleteNote(id);
+      });
+    }
   };
   const handleTagColorChange = (tag: string, color: string) => {
     const normalized = tag.trim().toUpperCase();
@@ -468,6 +506,9 @@ export default function DashboardContent({
   };
 
   const selectedProject = initialProjects.find(p => p.id === selectedProjectId);
+  const activeAccentColor = theme === 'light' 
+    ? '#ea580c' 
+    : (selectedProject?.color || '#f97316');
 
   // Todas as tags únicas do projeto (padronizadas em maiúsculas e sem duplicatas, para sugestões no modal)
   const allUniqueTags = useMemo(() => {
@@ -603,6 +644,38 @@ export default function DashboardContent({
     });
   };
 
+  // Rastreia e anima tarefas recém-criadas com expansão e luz
+  const prevTaskIdsRef = useRef<Set<string>>(new Set(initialTasks.map(t => t.id)));
+  useEffect(() => {
+    const currentIds = new Set(initialTasks.map(t => t.id));
+    const newTask = initialTasks.find(t => !prevTaskIdsRef.current.has(t.id));
+    if (newTask) {
+      setTimeout(() => {
+        const el = document.getElementById(`task-card-${newTask.id}`);
+        if (el) animateTaskEntrance(el, activeAccentColor);
+      }, 80);
+    }
+    prevTaskIdsRef.current = currentIds;
+  }, [initialTasks, activeAccentColor]);
+
+  // Rastreia e anima andamentos (logs) recém-adicionados na timeline
+  const prevLogIdsRef = useRef<Set<string>>(
+    new Set(selectedTaskForDetail?.logs.map(l => l.id) || [])
+  );
+  useEffect(() => {
+    if (selectedTaskForDetail) {
+      const currentIds = new Set(selectedTaskForDetail.logs.map(l => l.id));
+      const newLog = selectedTaskForDetail.logs.find(l => !prevLogIdsRef.current.has(l.id));
+      if (newLog) {
+        setTimeout(() => {
+          const el = document.getElementById(`log-item-${newLog.id}`);
+          if (el) animateLogEntrance(el, activeAccentColor);
+        }, 80);
+      }
+      prevLogIdsRef.current = currentIds;
+    }
+  }, [selectedTaskForDetail?.logs, activeAccentColor]);
+
   const handleCreateTask = () => {
     if (!newTaskTitle || !selectedProjectId) return;
     startTransition(async () => {
@@ -616,7 +689,12 @@ export default function DashboardContent({
       );
 
       if (editingTask) {
-        await updateTask(editingTask.id, newTaskTitle, newTaskDescription, parsedTags);
+        const taskId = editingTask.id;
+        await updateTask(taskId, newTaskTitle, newTaskDescription, parsedTags);
+        setTimeout(() => {
+          const el = document.getElementById(`task-card-${taskId}`);
+          if (el) animateItemUpdate(el, activeAccentColor);
+        }, 100);
       } else {
         await createTask(selectedProjectId, newTaskTitle, newTaskDescription, parsedTags, tempTaskAttachments);
       }
@@ -631,9 +709,18 @@ export default function DashboardContent({
 
   const handleDeleteTask = (id: string) => {
     if (!confirm("Excluir esta tarefa?")) return;
-    startTransition(async () => {
-      await deleteTask(id);
-    });
+    const el = document.getElementById(`task-card-${id}`);
+    if (el) {
+      animateItemExit(el, () => {
+        startTransition(async () => {
+          await deleteTask(id);
+        });
+      });
+    } else {
+      startTransition(async () => {
+        await deleteTask(id);
+      });
+    }
   };
 
   const openEditTask = (task: Task) => {
@@ -668,10 +755,14 @@ export default function DashboardContent({
     });
   };
 
-  const handleToggleTask = (task: Task) => {
+  const handleToggleTask = (task: Task, e?: React.MouseEvent) => {
     const newStatus = task.status === "completed" ? "pending" : "completed";
-    startTransition(async () => {
-      await updateTaskStatus(task.id, newStatus);
+    const buttonEl = (e?.currentTarget as HTMLElement) || document.getElementById(`toggle-btn-${task.id}`);
+    const cardEl = document.getElementById(`task-card-${task.id}`);
+    animateTaskToggle(cardEl, buttonEl, newStatus === "completed", () => {
+      startTransition(async () => {
+        await updateTaskStatus(task.id, newStatus);
+      });
     });
   };
 
@@ -837,6 +928,7 @@ export default function DashboardContent({
     return (
       <div
         key={task.id}
+        id={`task-card-${task.id}`}
         onClick={() => setSelectedTaskId(task.id)}
         className={cn(
           "task-card-item bg-[var(--surface)] border border-[var(--border)] rounded-xl overflow-hidden shadow-lg transition-all duration-300 group cursor-pointer hover:bg-[var(--surface-hover)] relative w-full min-w-0",
@@ -854,7 +946,8 @@ export default function DashboardContent({
         />
         <div className={cn("flex items-start w-full min-w-0", viewMode === 'list' ? "gap-2.5 sm:gap-3" : "gap-3 sm:gap-4")}>
           <button
-            onClick={(e) => { e.stopPropagation(); handleToggleTask(task); }}
+            id={`toggle-btn-${task.id}`}
+            onClick={(e) => { e.stopPropagation(); handleToggleTask(task, e); }}
             className={cn("flex-shrink-0 transition-colors", 
               viewMode === 'list' ? "mt-0.5" : "mt-1",
               task.status === "completed" ? "text-emerald-500" : "text-[#555] hover:text-[var(--accent)]"
@@ -1517,6 +1610,7 @@ export default function DashboardContent({
                           return (
                             <div
                               key={note.id}
+                              id={`note-card-${note.id}`}
                               draggable={!editingNoteId}
                               onDragStart={(e) => handleNoteDragStart(e, idx)}
                               onDragOver={(e) => handleNoteDragOver(e, idx)}
@@ -1695,7 +1789,11 @@ export default function DashboardContent({
                   <span className="hidden sm:inline">Excluir</span>
                 </button>
                 <button
-                  onClick={() => { handleToggleTask(selectedTaskForDetail); setSelectedTaskId(null); }}
+                  id={`modal-toggle-btn-${selectedTaskForDetail.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleTask(selectedTaskForDetail, e);
+                  }}
                   className={cn(
                     "px-2.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold rounded-lg flex items-center gap-1.5 transition-all",
                     selectedTaskForDetail.status === "completed" ? "bg-[var(--status-completed-bg)] text-[var(--status-completed)] border border-[var(--status-completed)]/30" : "bg-[var(--accent)] text-[var(--background)] shadow-md"
@@ -1767,6 +1865,7 @@ export default function DashboardContent({
                     {selectedTaskForDetail.logs.map((log) => (
                       <div
                         key={log.id}
+                        id={`log-item-${log.id}`}
                         className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-4 sm:p-6 shadow-md group hover:border-[var(--accent)]/30 transition-all relative overflow-hidden"
                       >
                         {/* Background glow sutil para o log */}

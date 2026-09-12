@@ -224,6 +224,25 @@ A base de dados será orquestrada via schema prisma:
   - **Integração no Ecossistema:** Aplicado na Barra Lateral (Sidebar), no Hero da tela inicial (Welcome Badge), no cabeçalho mobile e na tela de Autenticação (Login).
 - **Documentação Relacionada:** [doc/13_animacao_logo_motion_design.md](./doc/13_animacao_logo_motion_design.md)
 
+---
+
+### [2026-09-11] - Marco 14: Animações de Motion Design nos 6 Ciclos Operacionais do DevLog
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Implementação completa, calibragem de alto impacto tátil/visual e **fidelidade cromática absoluta à cor do projeto (Laranja / Âmbar)** para o ciclo de vida das entidades do DevLog (Notas, Tarefas e Logs) baseada na skill `motion-design`.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Módulo Centralizado de Motion (`src/lib/motion.ts`):** Abstração desacoplada de animações GSAP de alta performance com respeito nativo a `prefers-reduced-motion`.
+  - **Correção Cromática no Banco de Dados:** Identificado que o projeto "Carreira Livre" estava persistido com o código azul legado (`#3b82f6`). Atualizado via Prisma para `#f97316` (Laranja vibrante oficial).
+  - **Blindagem do Tema Âmbar (`getResolvedThemeColor` & `activeAccentColor`):** Quando a classe `.theme-light` (tema caderno/sépia) está ativa, o sistema força dinamicamente o uso de `#ea580c` / `#f97316`, garantindo que nenhuma animação exiba azul e sincronizando 100% com os botões e detalhes do painel.
+  - **1. Criar Nota:** Queda expressiva de post-it com rotação elástica acentuada (5 a 11 graus, `back.out(2.2)`), halo dourado/âmbar expansivo ao redor da nota e animação secundária elástica na fita adesiva.
+  - **2. Criar Tarefa:** Entrada vertical contundente (`y: -60`, `scale: 0.78 -> 1`, `back.out(1.8)`), feixe luminoso radiante (`boxShadow`) estritamente em Laranja e auto-scroll suave.
+  - **3. Editar Tarefa / Nota:** Feedback tátil evidente de "Bump" elástico com expansão perceptível (`scale: 1.05`), acompanhado de halo cintilante em Laranja/Âmbar e amortecimento vibrante.
+  - **4. Excluir Tarefa / Nota:** Antecipação nítida em vermelho de perigo (120ms), seguida de ejeção física arremessada para a esquerda com inclinação (`x: -140`, `rotation: -9deg`, `scale: 0.7`) e recolhimento limpo de espaço antes do Server Action.
+  - **5. Adicionar Andamento (Log):** Revelação cinematográfica de baixo para cima (`y: 50`, `scale: 0.8`), feixe luminoso sincronizado em Laranja/Âmbar e assentamento tátil na linha do tempo com foco automático.
+  - **6. Concluir / Reabrir Tarefa:** Vitória comemorativa sincronizada — pop gigante no botão de checkmark (`scale: 1.6`, `back.out(3.0)`) em paralelo com um halo esmeralda radiante (`boxShadow: 0 0 0 4px rgba(16, 185, 129, 0.9)`) disparado em todo o card da tarefa.
+  - **Sincronização Reativa Precisa:** Rastreamento determinístico de novos itens via `useRef<Set<string>>` no `DashboardContent.tsx`, passando dinamicamente `activeAccentColor` para todas as chamadas visuais.
+- **Documentação Relacionada:** [doc/14_animacoes_motion_design_ciclos_operacionais.md](./doc/14_animacoes_motion_design_ciclos_operacionais.md)
+
+
+
 
 
 
