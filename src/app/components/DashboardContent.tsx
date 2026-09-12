@@ -29,7 +29,8 @@ import {
   animateItemUpdate,
   animateItemExit,
   animateLogEntrance,
-  animateTaskToggle
+  animateTaskToggle,
+  animateModalCompleteExit
 } from "@/lib/motion";
 
 if (typeof window !== "undefined") {
@@ -508,7 +509,7 @@ export default function DashboardContent({
   const selectedProject = initialProjects.find(p => p.id === selectedProjectId);
   const activeAccentColor = theme === 'light' 
     ? '#ea580c' 
-    : (selectedProject?.color || '#f97316');
+    : (selectedProject?.color || '#3b82f6');
 
   // Todas as tags únicas do projeto (padronizadas em maiúsculas e sem duplicatas, para sugestões no modal)
   const allUniqueTags = useMemo(() => {
@@ -755,10 +756,23 @@ export default function DashboardContent({
     });
   };
 
-  const handleToggleTask = (task: Task, e?: React.MouseEvent) => {
+  const handleToggleTask = (task: Task, e?: React.MouseEvent, closeDetailModal: boolean = false) => {
     const newStatus = task.status === "completed" ? "pending" : "completed";
     const buttonEl = (e?.currentTarget as HTMLElement) || document.getElementById(`toggle-btn-${task.id}`);
     const cardEl = document.getElementById(`task-card-${task.id}`);
+
+    if (closeDetailModal) {
+      const modalEl = document.getElementById("task-detail-modal");
+      const backdropEl = document.getElementById("task-detail-backdrop");
+      animateModalCompleteExit(modalEl, backdropEl, newStatus === "completed", () => {
+        setSelectedTaskId(null);
+        startTransition(async () => {
+          await updateTaskStatus(task.id, newStatus);
+        });
+      }, buttonEl);
+      return;
+    }
+
     animateTaskToggle(cardEl, buttonEl, newStatus === "completed", () => {
       startTransition(async () => {
         await updateTaskStatus(task.id, newStatus);
@@ -1233,7 +1247,7 @@ export default function DashboardContent({
                   <div className="flex items-center gap-2 min-w-0">
                     <div 
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors"
-                      style={{ backgroundColor: theme === 'light' ? 'var(--accent)' : selectedProject.color }}
+                      style={{ backgroundColor: theme === 'light' ? 'var(--accent)' : (selectedProject?.color || 'var(--accent)') }}
                     />
                     <h2 className="text-base sm:text-lg lg:text-2xl font-bold text-[var(--foreground)] tracking-tight truncate max-w-[130px] xs:max-w-[190px] sm:max-w-none">
                       {selectedProject.name}
@@ -1487,8 +1501,8 @@ export default function DashboardContent({
                         onClick={() => { setEditingTask(null); setNewTaskTitle(""); setNewTaskDescription(""); setNewTaskTags(""); setIsTaskModalOpen(true); }}
                         className="px-3 py-2 sm:px-4 sm:py-2 text-[var(--background)] text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 shadow-lg flex-shrink-0"
                         style={{
-                          backgroundColor: theme === 'light' ? 'var(--accent)' : selectedProject.color,
-                          boxShadow: `0 4px 12px ${theme === 'light' ? 'var(--accent)' : selectedProject.color}30`
+                          backgroundColor: theme === 'light' ? 'var(--accent)' : (selectedProject?.color || 'var(--accent)'),
+                          boxShadow: `0 4px 12px ${theme === 'light' ? 'var(--accent)' : (selectedProject?.color || 'var(--accent)')}30`
                         }}
                       >
                         <Plus size={14} strokeWidth={3} /> Nova Tarefa
@@ -1743,8 +1757,8 @@ export default function DashboardContent({
       {/* DETALHE DA TAREFA (OVERLAY) */}
       {selectedTaskForDetail && (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-10">
-          <div className="absolute inset-0 bg-black/70 dark:bg-black/85 backdrop-blur-md transition-opacity" onClick={() => setSelectedTaskId(null)} />
-          <div className="relative w-full max-w-4xl h-[92vh] sm:h-auto sm:max-h-[90vh] bg-[var(--surface)] border-t sm:border border-[var(--border)] rounded-t-[28px] sm:rounded-[32px] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden scale-in-center">
+          <div id="task-detail-backdrop" className="absolute inset-0 bg-black/70 dark:bg-black/85 backdrop-blur-md transition-opacity" onClick={() => setSelectedTaskId(null)} />
+          <div id="task-detail-modal" className="relative w-full max-w-4xl h-[92vh] sm:h-auto sm:max-h-[90vh] bg-[var(--surface)] border-t sm:border border-[var(--border)] rounded-t-[28px] sm:rounded-[32px] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden scale-in-center">
             <header className="h-14 sm:h-16 lg:h-20 border-b border-[var(--border)] px-3 sm:px-6 lg:px-8 flex items-center justify-between flex-shrink-0 bg-[var(--sidebar)]">
               <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                 <button
@@ -1767,8 +1781,13 @@ export default function DashboardContent({
                 <button 
                   onClick={() => {
                     if (confirm("Excluir esta tarefa?")) {
-                      handleDeleteTask(selectedTaskForDetail.id);
-                      setSelectedTaskId(null);
+                      const modalEl = document.getElementById("task-detail-modal");
+                      animateItemExit(modalEl, () => {
+                        setSelectedTaskId(null);
+                        startTransition(async () => {
+                          await deleteTask(selectedTaskForDetail.id);
+                        });
+                      });
                     }
                   }} 
                   className={cn(
@@ -1792,7 +1811,7 @@ export default function DashboardContent({
                   id={`modal-toggle-btn-${selectedTaskForDetail.id}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleToggleTask(selectedTaskForDetail, e);
+                    handleToggleTask(selectedTaskForDetail, e, true);
                   }}
                   className={cn(
                     "px-2.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold rounded-lg flex items-center gap-1.5 transition-all",

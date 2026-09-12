@@ -241,6 +241,29 @@ A base de dados será orquestrada via schema prisma:
   - **Sincronização Reativa Precisa:** Rastreamento determinístico de novos itens via `useRef<Set<string>>` no `DashboardContent.tsx`, passando dinamicamente `activeAccentColor` para todas as chamadas visuais.
 - **Documentação Relacionada:** [doc/14_animacoes_motion_design_ciclos_operacionais.md](./doc/14_animacoes_motion_design_ciclos_operacionais.md)
 
+---
+
+### [2026-09-12] - Marco 15: Restauração Cromática no Tema Escuro e Sincronização de Tokens
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Correção de causa-raiz que mantinha o projeto ativo ("Carreira Livre") e componentes de tarefas em tons de laranja/âmbar após o usuário alternar para o tema escuro.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Restauração de Cor no Banco de Dados (Prisma):** Restabelecido o valor da coluna `color` do projeto "Carreira Livre" de `#f97316` para `#3b82f6` (azul elétrico padrão oficial do DevLog), unificando a identidade cromática com os demais workspaces.
+  - **Refatoração Defensiva de Estilos (`DashboardContent.tsx`):** Aplicada blindagem defensiva com optional chaining e fallback dinâmico (`selectedProject?.color || 'var(--accent)'`) no botão "+ NOVA TAREFA" e no marcador do cabeçalho, prevenindo inconsistências visuais e referências nulas.
+  - **Sincronização do Motor de Motion (`src/lib/motion.ts`):** Calibrado o fallback de `getResolvedThemeColor` para `#3b82f6` no tema escuro, mantendo a transição para `#ea580c` estritamente quando a classe `.theme-light` estiver presente.
+  - **Alinhamento do Schema Prisma (`prisma/schema.prisma`):** Atualizado o `@default` de `color` da entidade `Project` para `#3b82f6`, em paridade total com a Server Action `createProject`.
+- **Documentação Relacionada:** [doc/15_restauracao_cromatica_tema_escuro_sincronizacao.md](./doc/15_restauracao_cromatica_tema_escuro_sincronizacao.md)
+
+---
+
+### [2026-09-12] - Marco 16: Animação de Fechamento Físico do Modal na Conclusão de Tarefas
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Atendimento à solicitação de fechamento automático do modal de detalhes ao concluir tarefas, incorporando uma animação física de descarte/saída (*dismissal ejection*) análoga à animação de exclusão de notas.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Função Coreográfica `animateModalCompleteExit` (`src/lib/motion.ts`):** Desenvolvida coreografia em 3 fases com antecipação elástica no botão e no modal (`scale: 0.97`, halo radiante de vitória esmeralda ou azul elétrico), seguida de arremesso lateral com inclinação angular (`x: -140`, `y: -30`, `rotation: -6deg`, `scale: 0.8`, `power3.in`) e fade-out suave e concorrente do backdrop.
+  - **Integração no Fluxo de Conclusão (`DashboardContent.tsx`):** Expandida a função `handleToggleTask` com a flag `closeDetailModal: boolean = false`. Ao ser disparada dentro do modal de detalhes, executa a ejeção física antes de desvincular o ID selecionado e persistir o status no banco de dados via Server Action.
+  - **Harmonização da Ação de Excluir Tarefa:** O botão de exclusão de tarefas dentro do modal também foi integrado a `animateItemExit`, assegurando física consistente em todos os pontos de saída da janela flutuante.
+- **Documentação Relacionada:** [doc/16_animacao_fechamento_modal_conclusao_tarefa.md](./doc/16_animacao_fechamento_modal_conclusao_tarefa.md)
+
+
+
 
 
 

@@ -25,12 +25,12 @@ function getResolvedThemeColor(inputColor?: string): string {
   }
   return (inputColor && inputColor.trim() && !inputColor.includes("undefined") && inputColor !== "")
     ? inputColor.trim()
-    : "#f97316";
+    : "#3b82f6";
 }
 
 /**
  * Converte qualquer formato de cor (hex, rgb, ou fallback) em RGBA seguro
- * com fallback estrito em laranja vibrante (#ea580c / #f97316).
+ * com fallback dinâmico: âmbar no tema claro e azul no tema escuro (#3b82f6).
  */
 function resolveColor(inputColor?: string, alpha: number = 1): string {
   const resolved = getResolvedThemeColor(inputColor);
@@ -381,3 +381,84 @@ export function animateTaskToggle(
     }
   }
 }
+
+/**
+ * 7. FECHAR MODAL DE DETALHES COM ANIMAÇÃO FÍSICA (Dismissal Ejection)
+ * Coreografia inspirada no descarte expressivo de notas:
+ * 1. Antecipação tátil com pop no botão e halo de celebração (esmeralda para concluída, acento para reaberta)
+ * 2. Ejeção física da janela com inclinação (-6deg), aceleração lateral (x: -140, y: -30) e escala suave
+ * 3. Fade-out simultâneo do backdrop
+ */
+export function animateModalCompleteExit(
+  modalElement: HTMLElement | null,
+  backdropElement: HTMLElement | null,
+  isCompleted: boolean,
+  onComplete?: () => void,
+  buttonElement?: HTMLElement | null
+) {
+  if (isReducedMotion()) {
+    onComplete?.();
+    return;
+  }
+
+  if (!modalElement) {
+    onComplete?.();
+    return;
+  }
+
+  const tl = gsap.timeline({ onComplete });
+
+  const glowColor = isCompleted
+    ? "rgba(16, 185, 129, 0.9)"
+    : "rgba(59, 130, 246, 0.9)";
+  const shadowSpread = isCompleted
+    ? "rgba(16, 185, 129, 0.45)"
+    : "rgba(59, 130, 246, 0.45)";
+
+  // 1. Antecipação tátil e halo radiante de celebração (130ms)
+  tl.to(modalElement, {
+    scale: 0.97,
+    x: 8,
+    y: 2,
+    boxShadow: `0 0 0 3px ${glowColor}, 0 20px 50px ${shadowSpread}`,
+    duration: 0.13,
+    ease: "power1.out"
+  });
+
+  if (buttonElement) {
+    tl.to(
+      buttonElement,
+      {
+        scale: 1.18,
+        duration: 0.13,
+        ease: "back.out(2.5)"
+      },
+      0
+    );
+  }
+
+  // 2. Ejeção física arremessada para fora da tela com inclinação estilo nota (280ms)
+  tl.to(modalElement, {
+    x: -140,
+    y: -30,
+    rotation: -6,
+    scale: 0.8,
+    opacity: 0,
+    duration: 0.28,
+    ease: "power3.in"
+  });
+
+  // 3. Fade-out suave do backdrop em paralelo
+  if (backdropElement) {
+    tl.to(
+      backdropElement,
+      {
+        opacity: 0,
+        duration: 0.26,
+        ease: "power2.inOut"
+      },
+      0.08
+    );
+  }
+}
+
