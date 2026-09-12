@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { loginWithPassword } from "../actions/auth";
 import { LockKeyhole, ArrowRight } from "lucide-react";
+import DevLogLogo from "../components/DevLogLogo";
 
 export default function LoginPage() {
   const [state, action, isPending] = useActionState(
@@ -14,12 +15,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#111111] p-4 font-sans text-[#ededed]">
       <div className="w-full max-w-md animate-in fade-in duration-500">
         <div className="text-center mb-10">
-          <div className="w-16 h-16 bg-[#1a1a1a] border border-[#333333] rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl overflow-hidden">
-            <img 
-              src="/logo-devlog.png" 
-              alt="Logo DevLog" 
-              className="w-full h-full object-cover"
-            />
+          <div className="flex justify-center mb-6">
+            <DevLogLogo size="lg" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-white mb-2">DevLog</h1>
           <p className="text-[#888888]">Acesso restrito. Insira a senha do sistema.</p>

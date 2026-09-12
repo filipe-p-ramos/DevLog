@@ -211,7 +211,19 @@ A base de dados será orquestrada via schema prisma:
   - **Geração e Curadoria:** Exploração de múltiplos conceitos via IA generativa e seleção da evolução refinada das chaves de código com checkmark.
   - **Tratamento de Fundo e Transparência (Alpha Channel):** Processamento gráfico automatizado via `.NET System.Drawing` para recortar o squircle central em resolução 512x512 e aplicar máscara com cantos suaves 100% transparentes (`Alpha = 0`), eliminando o fundo preto exterior indesejado.
   - **Padronização dos Arquivos do Sistema:** Atualizados `public/logo-devlog.png` (usado na barra lateral e tela de autenticação) e `src/app/icon.png` (favicon oficial dos metadados).
-- **Documentação Relacionada:** [doc/12_novo_logotipo_identidade_visual.md](./doc/12_novo_logotipo_identidade_visual.md)
+---
+
+### [2026-09-11] - Marco 13: Animação do Logotipo com a Skill Motion Design (Three Layers & Micro-Interactions)
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Implementação de coreografia visual de alta fidelidade para o logotipo do DevLog baseada nos princípios oficiais da skill `motion-design` (Três Camadas: Primária, Secundária e Ambiente, arquétipo *Premium Tech*, física crível e acessibilidade com `prefers-reduced-motion`).
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Componentização Modular (`DevLogLogo.tsx`):** Criação de componente reutilizável com suporte a quatro escalas (`sm`, `md`, `lg`, `xl`) e ciclo de vida seguro via `useGSAP` com escopo isolado e liberação de memória automática.
+  - **Camada Ambiente (Ambient Layer):** Halo de luz difuso ciano e âmbar com respiração senoidal contínua (`sine.inOut`, período 2.8s) criando uma assinatura visual de sistema ativo.
+  - **Camada Primária (Primary Layer):** Entrada triunfal com overshoot sutil (`back.out(1.4)`, 650ms), rotação elástica de -4deg para 0deg e escala proporcional.
+  - **Camada Secundária (Secondary Layer):** Varredura de feixe especular de vidro fosco (*sheen sweep*) que percorre diagonalmente a superfície do emblema na entrada e durante a interação.
+  - **Micro-interações Táteis (Hover & Press):** Reação física instantânea no hover (`scale: 1.08`, leve inclinação 3D de 1.5deg e aumento do glow) e feedback tátil de clique (*anticipation squash* para 0.94 e recuperação elástica).
+  - **Integração no Ecossistema:** Aplicado na Barra Lateral (Sidebar), no Hero da tela inicial (Welcome Badge), no cabeçalho mobile e na tela de Autenticação (Login).
+- **Documentação Relacionada:** [doc/13_animacao_logo_motion_design.md](./doc/13_animacao_logo_motion_design.md)
+
 
 
 

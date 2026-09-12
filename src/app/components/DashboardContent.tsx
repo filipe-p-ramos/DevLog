@@ -22,6 +22,7 @@ import { twMerge } from "tailwind-merge";
 import { uploadAttachment } from "@/lib/supabase";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import DevLogLogo from "./DevLogLogo";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(useGSAP);
@@ -984,15 +985,9 @@ export default function DashboardContent({
               params.delete("project");
               router.push(`/?${params.toString()}`);
             }}
-            className="text-left hover:opacity-80 transition-opacity flex items-center gap-3 group"
+            className="text-left hover:opacity-90 transition-opacity flex items-center gap-3 group"
           >
-            <div className="relative w-10 h-10 overflow-hidden rounded-xl border border-[var(--border)] transition-transform duration-300 group-hover:scale-105 flex-shrink-0">
-              <img 
-                src="/logo-devlog.png" 
-                alt="Logo DevLog" 
-                className="w-full h-full object-cover"
-              />
-            </div>
+            <DevLogLogo size="md" />
             <div>
               <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)]">DevLog</h1>
               <p className="text-xs sm:text-sm text-[#888888] mt-0.5 font-medium">seus projetos em foco</p>
@@ -1598,15 +1593,15 @@ export default function DashboardContent({
               >
                 <Menu size={24} />
               </button>
-              <h1 className="ml-4 text-lg font-bold text-[var(--foreground)] tracking-tight">DevLog</h1>
+              <div className="ml-3 flex items-center gap-2.5">
+                <DevLogLogo size="sm" />
+                <h1 className="text-lg font-bold text-[var(--foreground)] tracking-tight">DevLog</h1>
+              </div>
             </header>
             <div ref={welcomeRef} className="flex-1 flex items-center justify-center bg-[var(--background)] p-4 sm:p-8">
             <div className="max-w-md w-full text-center space-y-6 sm:space-y-8">
-              <div className="welcome-badge relative inline-block">
-                <div className="absolute inset-0 bg-[var(--accent)]/20 blur-3xl rounded-full" />
-                <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-[var(--surface)] border border-[var(--border)] rounded-[24px] sm:rounded-[32px] flex items-center justify-center mx-auto shadow-2xl mb-4 sm:mb-6">
-                  <LayoutGrid size={36} className="text-[var(--accent)]" />
-                </div>
+              <div className="welcome-badge relative inline-block mb-4 sm:mb-6">
+                <DevLogLogo size="xl" />
               </div>
               <div className="welcome-text">
                 <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] mb-2 sm:mb-3 tracking-tight">DevLog</h2>
