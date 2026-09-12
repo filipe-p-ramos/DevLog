@@ -276,6 +276,33 @@ A base de dados será orquestrada via schema prisma:
   - **Calibração de Contraste e Acessibilidade (WCAG):** Ajustada a paleta cromática do box de resolução, badges e títulos no tema claro (sépia/caderno), substituindo o tom verde desbotado por verde floresta escuro de alta densidade (`text-emerald-950`), texto de resolução sólido sem opacidade e bordas nítidas para garantir legibilidade absoluta.
 - **Documentação Relacionada:** [doc/17_subtarefas_e_acoes_pendentes.md](./doc/17_subtarefas_e_acoes_pendentes.md)
 
+---
+
+### [2026-09-12] - Marco 18: Responsividade Mobile (Dynamic Viewport), Proteção de Gestos e Limpeza de UI
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Correção da sobreposição do modal de detalhes da tarefa em dispositivos móveis Android (Chrome com grupo de guias / barra inferior de abas), resolução do bug ao arrastar da esquerda para a direita para voltar (conflito de swipe que abria o menu lateral e selecionava projetos involuntariamente) e eliminação do botão redundante de configurações na sidebar.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Limpeza de UI (`DashboardContent.tsx`):** Removido o botão redundante de engrenagem (`Settings`) do topo da barra lateral esquerda, concentrando o acesso oficial às configurações no cabeçalho superior direito da aplicação.
+  - **Calibração de Dynamic Viewport (`dvh`):** Substituição de `h-[92vh]` por `h-[calc(100dvh-3.5rem)] sm:h-auto sm:max-h-[88dvh] max-h-[calc(100dvh-3.5rem)]` no modal de detalhes e container delimitado em `100dvh`. Essa folga dinâmica de `3.5rem` (56px) garante que mesmo sob a barra de endereços do topo somada à barra inferior de guias do Chrome Mobile, o cabeçalho e todos os botões de ação (fechar, editar, excluir e concluir) permaneçam 100% visíveis e operáveis. Adicionado `pb-[max(env(safe-area-inset-bottom),0.5rem)]` para proteger contra barras de navegação do sistema.
+  - **Sincronização com o Gesto de Voltar do Android (`Popstate`):** Implementada integração defensiva via `history.pushState` e evento `popstate`. Ao acionar o gesto nativo de voltar no celular, o app fecha suavemente qualquer modal ou sidebar aberta sem navegar para fora ou alternar de projeto.
+  - **Bloqueio de Ghost-Clicks na Sidebar:** Introduzido estado `isSidebarTransitioning` que aplica `pointer-events-none` na lista de projetos durante os primeiros 300ms de animação de entrada da sidebar, impedindo que o dedo do usuário em movimento acione acidentalmente outros projetos.
+  - **Filtro de Swipe no Menu Hambúrguer:** Tratamento de coordenadas de toque (`diff > 12px`) no botão de abertura do menu móvel, desconsiderando gestos de arrasto e preservando toques intencionais.
+  - **Navegação com `router.replace`:** Substituição de `router.push` por `router.replace` na seleção de projetos para evitar poluição da pilha de histórico.
+  - **Desativação de Overscroll Horizontal (`globals.css`):** Aplicação de `overscroll-behavior-x: none` no `html` e `body`.
+- **Documentação Relacionada:** [doc/18_responsividade_mobile_gestos_e_limpeza_ui.md](./doc/18_responsividade_mobile_gestos_e_limpeza_ui.md)
+
+---
+
+### [2026-09-12] - Marco 19: Filtro de Tarefas com Ações Pendentes
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Atendimento à solicitação de inclusão de uma terceira opção de filtragem na barra superior de status do painel de tarefas, permitindo filtrar e isolar instantaneamente todas as tarefas ativas que contêm subtarefas/ações pendentes de resolução.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Expansão do Mecanismo de Filtragem (`DashboardContent.tsx`):** Adicionado o valor `"subtasks_pending"` ao estado `statusFilter`. Implementada a lógica reativa com `useMemo` identificando tarefas com `status !== "completed"` e `subtasks.some(s => !s.completed)`.
+  - **Aba de Ações Pendentes na Barra Superior:** Criada a aba com ícone dedicado `ListTodo size={14}`, badge com contagem em tempo real e linha indicadora inferior âmbar/dourada (`bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.6)]`), em total coerência cromática com a badge dos cartões de tarefas.
+  - **Sincronização com Tags Contextuais:** A barra de filtros de tags contextuais (`currentStatusTasks`) atualiza-se dinamicamente quando a aba está ativa, permitindo ao usuário filtrar por tag dentro do universo de tarefas com ações pendentes.
+  - **Feedback Contextual no Estado Vazio:** Exibição da mensagem *"Nenhuma tarefa com ações pendentes neste projeto."* caso não haja itens correspondentes.
+- **Documentação Relacionada:** [doc/19_filtro_tarefas_com_acoes_pendentes.md](./doc/19_filtro_tarefas_com_acoes_pendentes.md)
+
+
+
 
 
 

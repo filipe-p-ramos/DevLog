@@ -45,6 +45,10 @@
   background-size: 24px 24px;
 }
 
+html, body {
+  overscroll-behavior-x: none;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);

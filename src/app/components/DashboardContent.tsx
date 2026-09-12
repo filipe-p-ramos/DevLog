@@ -125,7 +125,7 @@ export default function DashboardContent({
   const [isAddingLog, setIsAddingLog] = useState(false);
 
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"pending" | "completed">("pending");
+  const [statusFilter, setStatusFilter] = useState<"pending" | "completed" | "subtasks_pending">("pending");
 
   const [tempLogAttachments, setTempLogAttachments] = useState<string[]>([]);
   const [tempTaskAttachments, setTempTaskAttachments] = useState<string[]>([]);
@@ -136,6 +136,14 @@ export default function DashboardContent({
   const [newTaskTags, setNewTaskTags] = useState("");
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarTransitioning, setIsSidebarTransitioning] = useState(false);
+  const menuTouchStartXRef = useRef<number | null>(null);
+
+  const openSidebar = () => {
+    setIsSidebarOpen(true);
+    setIsSidebarTransitioning(true);
+    setTimeout(() => setIsSidebarTransitioning(false), 300);
+  };
   const [mobileTab, setMobileTab] = useState<'tasks' | 'notes'>('tasks');
   const [mobileProjectMenuId, setMobileProjectMenuId] = useState<string | null>(null);
 
@@ -266,19 +274,19 @@ export default function DashboardContent({
       ease: "back.out(1.7)",
       clearProps: "transform,opacity,visibility"
     })
-    .from(".welcome-text", {
-      y: 18,
-      autoAlpha: 0,
-      duration: 0.55,
-      clearProps: "transform,opacity,visibility"
-    }, "-=0.3")
-    .from(".welcome-card", {
-      y: 22,
-      autoAlpha: 0,
-      stagger: 0.1,
-      duration: 0.45,
-      clearProps: "transform,opacity,visibility"
-    }, "-=0.2");
+      .from(".welcome-text", {
+        y: 18,
+        autoAlpha: 0,
+        duration: 0.55,
+        clearProps: "transform,opacity,visibility"
+      }, "-=0.3")
+      .from(".welcome-card", {
+        y: 22,
+        autoAlpha: 0,
+        stagger: 0.1,
+        duration: 0.45,
+        clearProps: "transform,opacity,visibility"
+      }, "-=0.2");
 
     const welcomeCta = welcomeRef.current.querySelector(".welcome-cta");
     if (welcomeCta) {
@@ -305,12 +313,12 @@ export default function DashboardContent({
       duration: 0.4,
       clearProps: "transform,opacity,visibility"
     })
-    .from(".header-top-controls", {
-      x: 16,
-      autoAlpha: 0,
-      duration: 0.4,
-      clearProps: "transform,opacity,visibility"
-    }, "<");
+      .from(".header-top-controls", {
+        x: 16,
+        autoAlpha: 0,
+        duration: 0.4,
+        clearProps: "transform,opacity,visibility"
+      }, "<");
 
     const tagPills = headerRef.current.querySelectorAll(".header-tag-pill");
     if (tagPills.length > 0) {
@@ -401,6 +409,79 @@ export default function DashboardContent({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Sincronização de Modais e Sidebar com o Gesto de Voltar do Android (History Popstate)
+  const isAnyOverlayOpen = Boolean(
+    selectedTaskId ||
+    isProjectModalOpen ||
+    editingProject ||
+    isTaskModalOpen ||
+    editingTask ||
+    isNoteModalOpen ||
+    isSettingsModalOpen ||
+    previewImage ||
+    isSidebarOpen
+  );
+
+  const pushedOverlayHistoryRef = useRef(false);
+  const isClosingViaUiRef = useRef(false);
+
+  useEffect(() => {
+    if (isAnyOverlayOpen) {
+      if (!pushedOverlayHistoryRef.current) {
+        window.history.pushState({ devlogOverlay: true }, "");
+        pushedOverlayHistoryRef.current = true;
+      }
+    } else {
+      if (pushedOverlayHistoryRef.current) {
+        pushedOverlayHistoryRef.current = false;
+        if (isClosingViaUiRef.current) {
+          isClosingViaUiRef.current = false;
+          window.history.back();
+        }
+      }
+    }
+  }, [isAnyOverlayOpen]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (pushedOverlayHistoryRef.current) {
+        pushedOverlayHistoryRef.current = false;
+        // Fecha o overlay atualmente ativo prioritariamente
+        if (previewImage) {
+          setPreviewImage(null);
+        } else if (selectedTaskId) {
+          setSelectedTaskId(null);
+          setIsAddingLog(false);
+        } else if (isSettingsModalOpen) {
+          setIsSettingsModalOpen(false);
+        } else if (isNoteModalOpen) {
+          setIsNoteModalOpen(false);
+        } else if (isTaskModalOpen || editingTask) {
+          setIsTaskModalOpen(false);
+          setEditingTask(null);
+        } else if (isProjectModalOpen || editingProject) {
+          setIsProjectModalOpen(false);
+          setEditingProject(null);
+        } else if (isSidebarOpen) {
+          setIsSidebarOpen(false);
+        }
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [
+    previewImage,
+    selectedTaskId,
+    isSettingsModalOpen,
+    isNoteModalOpen,
+    isTaskModalOpen,
+    editingTask,
+    isProjectModalOpen,
+    editingProject,
+    isSidebarOpen
+  ]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -528,8 +609,8 @@ export default function DashboardContent({
   };
 
   const selectedProject = initialProjects.find(p => p.id === selectedProjectId);
-  const activeAccentColor = theme === 'light' 
-    ? '#ea580c' 
+  const activeAccentColor = theme === 'light'
+    ? '#ea580c'
     : (selectedProject?.color || '#3b82f6');
 
   // Todas as tags únicas do projeto (padronizadas em maiúsculas e sem duplicatas, para sugestões no modal)
@@ -541,6 +622,9 @@ export default function DashboardContent({
 
   // Tarefas no status atualmente selecionado
   const currentStatusTasks = useMemo(() => {
+    if (statusFilter === "subtasks_pending") {
+      return initialTasks.filter(t => t.status !== "completed" && t.subtasks && t.subtasks.some(s => !s.completed));
+    }
     return initialTasks.filter(t => t.status === statusFilter);
   }, [initialTasks, statusFilter]);
 
@@ -593,12 +677,12 @@ export default function DashboardContent({
     const query = searchQuery.toLowerCase().trim();
     return initialTasks.filter(t => {
       const matchesTag = !selectedTag || t.tags.some(tag => tag.trim().toUpperCase() === selectedTag.trim().toUpperCase());
-      const matchesQuery = 
+      const matchesQuery =
         t.title.toLowerCase().includes(query) ||
         (t.description || "").toLowerCase().includes(query) ||
         t.logs.some(l => l.content.toLowerCase().includes(query)) ||
-        (t.subtasks && t.subtasks.some(s => 
-          s.title.toLowerCase().includes(query) || 
+        (t.subtasks && t.subtasks.some(s =>
+          s.title.toLowerCase().includes(query) ||
           (s.resolutionNote && s.resolutionNote.toLowerCase().includes(query))
         )) ||
         t.tags.some(tag => tag.toLowerCase().includes(query));
@@ -620,6 +704,9 @@ export default function DashboardContent({
   const normalTasks = useMemo(() => {
     return initialTasks.filter(t => {
       const matchesTag = !selectedTag || t.tags.some(tag => tag.trim().toUpperCase() === selectedTag.trim().toUpperCase());
+      if (statusFilter === "subtasks_pending") {
+        return matchesTag && t.status !== "completed" && t.subtasks && t.subtasks.some(s => !s.completed);
+      }
       const matchesStatus = t.status === statusFilter;
       return matchesTag && matchesStatus;
     });
@@ -637,7 +724,7 @@ export default function DashboardContent({
 
       const params = new URLSearchParams(searchParams.toString());
       params.set("project", id);
-      router.push(`/?${params.toString()}`);
+      router.replace(`/?${params.toString()}`);
     });
   };
 
@@ -881,15 +968,15 @@ export default function DashboardContent({
   const handleMoveProject = (id: string, direction: 'up' | 'down') => {
     const currentIndex = initialProjects.findIndex(p => p.id === id);
     if (currentIndex === -1) return;
-    
+
     const newProjects = [...initialProjects];
     const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    
+
     if (newIndex < 0 || newIndex >= newProjects.length) return;
-    
+
     // Swap
     [newProjects[currentIndex], newProjects[newIndex]] = [newProjects[newIndex], newProjects[currentIndex]];
-    
+
     const projectIds = newProjects.map(p => p.id);
     startTransition(async () => {
       await reorderProjects(projectIds);
@@ -1046,7 +1133,7 @@ export default function DashboardContent({
           <button
             id={`toggle-btn-${task.id}`}
             onClick={(e) => { e.stopPropagation(); handleToggleTask(task, e); }}
-            className={cn("flex-shrink-0 transition-colors", 
+            className={cn("flex-shrink-0 transition-colors",
               viewMode === 'list' ? "mt-0.5" : "mt-1",
               task.status === "completed" ? "text-emerald-500" : "text-[#555] hover:text-[var(--accent)]"
             )}
@@ -1057,22 +1144,22 @@ export default function DashboardContent({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 sm:gap-4 w-full min-w-0">
               <div className={cn(
-                "flex-1 min-w-0 font-semibold leading-tight break-words [overflow-wrap:anywhere]", 
+                "flex-1 min-w-0 font-semibold leading-tight break-words [overflow-wrap:anywhere]",
                 task.status === "completed" ? "text-[#888] line-through" : "text-[var(--foreground)]",
                 viewMode === 'list' ? "text-sm" : "text-base sm:text-lg mb-1"
               )}>
                 {viewMode === 'list' ? task.title : renderContent(task.title, task.attachments)}
               </div>
               <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); openEditTask(task); }} 
+                <button
+                  onClick={(e) => { e.stopPropagation(); openEditTask(task); }}
                   className="p-1.5 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--accent)]/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
                   title="Editar tarefa"
                 >
                   <Edit2 size={13} />
                 </button>
-                <button 
-                  onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }} 
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}
                   className="p-1.5 text-[#888] hover:text-red-500 hover:bg-red-600/20 bg-[var(--surface-hover)] sm:bg-[var(--background)] rounded-md transition-all"
                   title="Excluir tarefa"
                 >
@@ -1128,8 +1215,8 @@ export default function DashboardContent({
                   <span
                     className={cn(
                       "font-bold uppercase tracking-widest flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded border transition-all shadow-sm",
-                      viewMode === 'list' 
-                        ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)]" 
+                      viewMode === 'list'
+                        ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)]"
                         : "text-[9px] sm:text-[10px]"
                     )}
                     style={{
@@ -1145,11 +1232,11 @@ export default function DashboardContent({
                 <span
                   className={cn(
                     "font-bold uppercase tracking-widest flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded border transition-all",
-                    viewMode === 'list' 
-                      ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)] shadow-sm" 
+                    viewMode === 'list'
+                      ? "text-[9px] bg-[var(--surface-hover)] border-[var(--border)] shadow-sm"
                       : "text-[9px] sm:text-[10px]"
                   )}
-                  style={{ 
+                  style={{
                     color: logCount > 0 ? (theme === 'light' ? 'var(--accent)' : (selectedProject?.color || 'var(--accent)')) : '#666',
                     borderColor: logCount > 0 ? (theme === 'light' ? 'var(--accent)40' : `${selectedProject?.color || 'var(--accent)'}40`) : 'transparent'
                   }}
@@ -1176,7 +1263,7 @@ export default function DashboardContent({
       {/* SIDEBAR - Mobile Responsive */}
       {/* Backdrop para Mobile */}
       {isSidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[65] lg:hidden animate-in fade-in duration-300"
           onClick={() => setIsSidebarOpen(false)}
         />
@@ -1188,20 +1275,20 @@ export default function DashboardContent({
       )}>
         <div className="p-5 sm:p-6 border-b border-[var(--border)]/50 flex justify-between items-center">
           <div>
-          <button 
-            onClick={() => {
-              const params = new URLSearchParams(searchParams.toString());
-              params.delete("project");
-              router.push(`/?${params.toString()}`);
-            }}
-            className="text-left hover:opacity-90 transition-opacity flex items-center gap-3 group"
-          >
-            <DevLogLogo size="md" />
-            <div>
-              <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)]">DevLog</h1>
-              <p className="text-xs sm:text-sm text-[#888888] mt-0.5 font-medium">seus projetos em foco</p>
-            </div>
-          </button>
+            <button
+              onClick={() => {
+                const params = new URLSearchParams(searchParams.toString());
+                params.delete("project");
+                router.push(`/?${params.toString()}`);
+              }}
+              className="text-left hover:opacity-90 transition-opacity flex items-center gap-3 group"
+            >
+              <DevLogLogo size="md" />
+              <div>
+                <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-[var(--foreground)]">DevLog</h1>
+                <p className="text-xs sm:text-sm text-[#888888] mt-0.5 font-medium">seus projetos em foco</p>
+              </div>
+            </button>
           </div>
           <div className="flex items-center gap-1 sm:gap-2">
             <button
@@ -1209,17 +1296,6 @@ export default function DashboardContent({
               className="lg:hidden p-2 text-[#666] hover:text-[var(--foreground)]"
             >
               <X size={20} />
-            </button>
-            <button
-              onClick={() => {
-                setSettingsError(null);
-                setSettingsSuccess(null);
-                setIsSettingsModalOpen(true);
-              }}
-              className="p-2 text-[#666666] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-md transition-all"
-              title="Configurações e Segurança"
-            >
-              <Settings size={18} />
             </button>
             <button
               onClick={handleLogout}
@@ -1232,7 +1308,7 @@ export default function DashboardContent({
           </div>
         </div>
 
-        <div className="p-4 flex-1 overflow-y-auto">
+        <div className={cn("p-4 flex-1 overflow-y-auto", isSidebarTransitioning && "pointer-events-none")}>
           <div className="mb-8">
             <h2 className="text-xs font-bold text-[#666666] uppercase tracking-wider mb-3 px-2">Projetos</h2>
             <nav className="space-y-1">
@@ -1245,8 +1321,8 @@ export default function DashboardContent({
                       ? "bg-[var(--surface-hover)] text-[var(--foreground)] shadow-lg"
                       : "text-[#888] hover:bg-[var(--surface-hover)]/40 hover:text-[var(--foreground)]"
                   )}
-                  style={selectedProjectId === project.id ? { 
-                    borderLeft: `3px solid ${theme === 'light' ? 'var(--accent)' : project.color}` 
+                  style={selectedProjectId === project.id ? {
+                    borderLeft: `3px solid ${theme === 'light' ? 'var(--accent)' : project.color}`
                   } : {}}
                 >
                   <button
@@ -1293,16 +1369,16 @@ export default function DashboardContent({
                       ? "flex absolute right-2 top-1/2 -translate-y-1/2"
                       : "hidden lg:group-hover:flex absolute right-2 top-1/2 -translate-y-1/2"
                   )}>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'up'); }} 
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'up'); }}
                       disabled={initialProjects.indexOf(project) === 0}
                       className="p-1 hover:text-[var(--accent)] disabled:opacity-20"
                       title="Mover para cima"
                     >
                       <ChevronUp size={14} />
                     </button>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'down'); }} 
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleMoveProject(project.id, 'down'); }}
                       disabled={initialProjects.indexOf(project) === initialProjects.length - 1}
                       className="p-1 hover:text-[var(--accent)] disabled:opacity-20"
                       title="Mover para baixo"
@@ -1340,14 +1416,28 @@ export default function DashboardContent({
               <div className="h-14 sm:h-16 lg:h-20 flex items-center justify-between gap-2">
                 <div className="header-top-info flex items-center gap-2 sm:gap-4 min-w-0">
                   <button
-                    onClick={() => setIsSidebarOpen(true)}
+                    onClick={() => openSidebar()}
+                    onTouchStart={(e) => {
+                      menuTouchStartXRef.current = e.touches[0].clientX;
+                    }}
+                    onTouchEnd={(e) => {
+                      if (menuTouchStartXRef.current !== null) {
+                        const diff = Math.abs(e.changedTouches[0].clientX - menuTouchStartXRef.current);
+                        menuTouchStartXRef.current = null;
+                        if (diff > 12) {
+                          // Gesto horizontal de voltar do sistema, ignorar clique
+                          e.preventDefault();
+                          return;
+                        }
+                      }
+                    }}
                     className="lg:hidden p-2 -ml-1 text-[#888] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded-xl transition-all"
                     aria-label="Abrir menu de projetos"
                   >
                     <Menu size={22} />
                   </button>
                   <div className="flex items-center gap-2 min-w-0">
-                    <div 
+                    <div
                       className="w-2.5 h-2.5 rounded-full flex-shrink-0 transition-colors"
                       style={{ backgroundColor: theme === 'light' ? 'var(--accent)' : (selectedProject?.color || 'var(--accent)') }}
                     />
@@ -1421,7 +1511,7 @@ export default function DashboardContent({
                       !selectedTag ? "bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)]" : "bg-[var(--surface)] border-[var(--border)] text-[#666] hover:border-[#444]"
                     )}
                   >
-                    <span>Todas</span>
+                    <span>TODAS</span>
                     <span className={cn(
                       "text-[10px] px-1.5 py-0.5 rounded-full font-black",
                       !selectedTag ? "bg-[var(--accent)]/30 text-current" : "bg-black/10 dark:bg-white/10 text-[#777]"
@@ -1481,11 +1571,11 @@ export default function DashboardContent({
 
               {/* Status Tabs and Search */}
               <div className="header-status-tabs py-2.5 flex flex-col sm:flex-row sm:items-center justify-start gap-3 sm:gap-6 lg:gap-8 border-t border-[var(--border)]/40 w-full min-w-0">
-                <div className="flex items-center gap-5 sm:gap-6 flex-shrink-0">
+                <div className="flex items-center gap-3.5 sm:gap-5 lg:gap-6 flex-shrink-0 overflow-x-auto no-scrollbar">
                   <button
                     onClick={() => setStatusFilter("pending")}
                     className={cn(
-                      "pb-1 text-sm font-bold transition-all relative flex items-center gap-1.5",
+                      "pb-1 text-xs sm:text-sm font-bold transition-all relative flex items-center gap-1.5 flex-shrink-0",
                       statusFilter === "pending" ? "text-[var(--accent)]" : "text-[#666] hover:text-[#888]"
                     )}
                   >
@@ -1499,9 +1589,37 @@ export default function DashboardContent({
                     {statusFilter === "pending" && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]" />}
                   </button>
                   <button
+                    onClick={() => setStatusFilter("subtasks_pending")}
+                    className={cn(
+                      "pb-1 text-xs sm:text-sm font-bold transition-all relative flex items-center gap-1.5 flex-shrink-0",
+                      statusFilter === "subtasks_pending"
+                        ? (theme === 'light' ? "text-amber-900" : "text-amber-400")
+                        : "text-[#666] hover:text-[#888]"
+                    )}
+                    title="Tarefas com ações ou subtarefas pendentes de resolução"
+                  >
+                    <span>Ações Pendentes</span>
+                    <span className={cn(
+                      "text-[10px] font-black px-1.5 py-0.5 rounded-md",
+                      statusFilter === "subtasks_pending"
+                        ? (theme === 'light' ? "bg-amber-800/20 text-amber-950 border border-amber-900/30" : "bg-amber-400/20 text-amber-300 border border-amber-400/30")
+                        : "bg-[var(--surface)] text-[#666]"
+                    )}>
+                      {initialTasks.filter(t => t.status !== "completed" && t.subtasks && t.subtasks.some(s => !s.completed)).length}
+                    </span>
+                    {statusFilter === "subtasks_pending" && (
+                      <div
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500"
+                        style={{
+                          boxShadow: theme === 'dark' ? '0 0 10px rgba(245, 158, 11, 0.6)' : 'none'
+                        }}
+                      />
+                    )}
+                  </button>
+                  <button
                     onClick={() => setStatusFilter("completed")}
                     className={cn(
-                      "pb-1 text-sm font-bold transition-all relative flex items-center gap-1.5",
+                      "pb-1 text-xs sm:text-sm font-bold transition-all relative flex items-center gap-1.5 flex-shrink-0",
                       statusFilter === "completed" ? "text-[var(--status-completed)]" : "text-[#666] hover:text-[#888]"
                     )}
                   >
@@ -1536,7 +1654,7 @@ export default function DashboardContent({
                     className="w-full pl-9 pr-8 py-2 bg-[var(--sidebar)] border border-[var(--border)] rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50 focus:border-[var(--accent)] transition-all shadow-inner"
                   />
                   {searchQuery && (
-                    <button 
+                    <button
                       onClick={() => setSearchQuery("")}
                       className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-[#666] hover:text-[var(--foreground)]"
                     >
@@ -1555,8 +1673,8 @@ export default function DashboardContent({
                   onClick={() => setMobileTab('tasks')}
                   className={cn(
                     "flex-1 min-w-0 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2",
-                    mobileTab === 'tasks' 
-                      ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm border border-[var(--border)] font-black" 
+                    mobileTab === 'tasks'
+                      ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm border border-[var(--border)] font-black"
                       : "text-[#777] hover:text-[var(--foreground)]"
                   )}
                 >
@@ -1573,8 +1691,8 @@ export default function DashboardContent({
                   onClick={() => setMobileTab('notes')}
                   className={cn(
                     "flex-1 min-w-0 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2",
-                    mobileTab === 'notes' 
-                      ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm border border-[var(--border)] font-black" 
+                    mobileTab === 'notes'
+                      ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm border border-[var(--border)] font-black"
                       : "text-[#777] hover:text-[var(--foreground)]"
                   )}
                 >
@@ -1682,7 +1800,13 @@ export default function DashboardContent({
                     ) : (
                       /* MODO NORMAL: LISTA POR STATUS ATIVO */
                       tasks.length === 0 ? (
-                        <div className="text-center py-20 opacity-40 text-sm font-medium">Nenhuma tarefa encontrada neste filtro.</div>
+                        <div className="text-center py-20 opacity-40 text-sm font-medium">
+                          {statusFilter === "subtasks_pending"
+                            ? "Nenhuma tarefa com ações pendentes neste projeto."
+                            : statusFilter === "completed"
+                              ? "Nenhuma tarefa concluída neste projeto."
+                              : "Nenhuma tarefa pendente neste filtro."}
+                        </div>
                       ) : (
                         <div className="grid grid-cols-1 gap-3 sm:gap-4 w-full min-w-0">
                           {tasks.map(task => renderTaskCard(task))}
@@ -1746,7 +1870,7 @@ export default function DashboardContent({
                               }}
                             >
                               {/* Efeito de fita adesiva clássica e indicador de arraste */}
-                              <div 
+                              <div
                                 className="absolute -top-3.5 sm:-top-4 left-1/2 -translate-x-1/2 w-16 sm:w-20 h-5 sm:h-6 bg-white/45 backdrop-blur-[2px] border border-white/30 shadow-sm flex items-center justify-center pointer-events-none rounded-[1px]"
                                 title="Arraste para trocar de posição"
                               >
@@ -1798,7 +1922,7 @@ export default function DashboardContent({
             {/* Mobile Header para Estado Vazio */}
             <header className="lg:hidden h-16 border-b border-[var(--border)] flex items-center px-4 bg-[var(--background)]/80 backdrop-blur-md sticky top-0 z-40">
               <button
-                onClick={() => setIsSidebarOpen(true)}
+                onClick={() => openSidebar()}
                 className="p-2 text-[#666] hover:text-[var(--foreground)]"
               >
                 <Menu size={24} />
@@ -1809,58 +1933,58 @@ export default function DashboardContent({
               </div>
             </header>
             <div ref={welcomeRef} className="flex-1 flex items-center justify-center bg-[var(--background)] p-4 sm:p-8">
-            <div className="max-w-md w-full text-center space-y-6 sm:space-y-8">
-              <div className="welcome-badge relative inline-block mb-4 sm:mb-6">
-                <DevLogLogo size="xl" />
-              </div>
-              <div className="welcome-text">
-                <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] mb-2 sm:mb-3 tracking-tight">DevLog</h2>
-                <p className="text-xs sm:text-sm text-[#888] font-medium leading-relaxed">
-                  Bem-vindo de volta! Selecione um projeto na barra lateral para gerenciar suas tarefas e notas, ou crie um novo workspace.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
-                <div 
-                  onClick={() => setIsProjectModalOpen(true)}
-                  className="welcome-card p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
-                >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
-                    <Plus size={18} className="text-[var(--accent)]" />
-                  </div>
-                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 sm:mb-1">Novo Projeto</h3>
-                  <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Crie seu workspace</p>
+              <div className="max-w-md w-full text-center space-y-6 sm:space-y-8">
+                <div className="welcome-badge relative inline-block mb-4 sm:mb-6">
+                  <DevLogLogo size="xl" />
                 </div>
-                <div 
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="welcome-card p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
-                >
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
-                    <Search size={18} className="text-emerald-500" />
-                  </div>
-                  <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 sm:mb-1">Ver Projetos</h3>
-                  <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Navegue no menu</p>
+                <div className="welcome-text">
+                  <h2 className="text-2xl sm:text-3xl font-black text-[var(--foreground)] mb-2 sm:mb-3 tracking-tight">DevLog</h2>
+                  <p className="text-xs sm:text-sm text-[#888] font-medium leading-relaxed">
+                    Bem-vindo de volta! Selecione um projeto na barra lateral para gerenciar suas tarefas e notas, ou crie um novo workspace.
+                  </p>
                 </div>
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
+                  <div
+                    onClick={() => setIsProjectModalOpen(true)}
+                    className="welcome-card p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
+                  >
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-[var(--accent)]/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
+                      <Plus size={18} className="text-[var(--accent)]" />
+                    </div>
+                    <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 sm:mb-1">Novo Projeto</h3>
+                    <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Crie seu workspace</p>
+                  </div>
+                  <div
+                    onClick={() => openSidebar()}
+                    className="welcome-card p-4 sm:p-6 bg-[var(--surface)] border border-[var(--border)] rounded-2xl text-left hover:border-[var(--accent)]/50 transition-all group cursor-pointer"
+                  >
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">
+                      <Search size={18} className="text-emerald-500" />
+                    </div>
+                    <h3 className="text-sm font-bold text-[var(--foreground)] mb-0.5 sm:mb-1">Ver Projetos</h3>
+                    <p className="text-[10px] text-[#666] font-bold uppercase tracking-wider">Navegue no menu</p>
+                  </div>
+                </div>
+
+                {initialProjects.length === 0 && (
+                  <button
+                    onClick={() => setIsProjectModalOpen(true)}
+                    className="welcome-cta mt-6 sm:mt-8 px-6 sm:px-8 py-3.5 sm:py-4 bg-[var(--accent)] text-[var(--background)] font-black uppercase text-xs rounded-2xl shadow-[0_10px_20px_var(--accent-30)] hover:scale-105 active:scale-95 transition-all tracking-widest"
+                  >
+                    Começar Agora
+                  </button>
+                )}
               </div>
-              
-              {initialProjects.length === 0 && (
-                <button
-                  onClick={() => setIsProjectModalOpen(true)}
-                  className="welcome-cta mt-6 sm:mt-8 px-6 sm:px-8 py-3.5 sm:py-4 bg-[var(--accent)] text-[var(--background)] font-black uppercase text-xs rounded-2xl shadow-[0_10px_20px_var(--accent-30)] hover:scale-105 active:scale-95 transition-all tracking-widest"
-                >
-                  Começar Agora
-                </button>
-              )}
             </div>
-          </div>
           </>
         )}
       </main>
 
       {/* DETALHE DA TAREFA (OVERLAY) */}
       {selectedTaskForDetail && (
-        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-10">
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 lg:p-10 h-[100dvh] max-h-[100dvh]">
           <div id="task-detail-backdrop" className="absolute inset-0 bg-black/70 dark:bg-black/85 backdrop-blur-md transition-opacity" onClick={() => setSelectedTaskId(null)} />
-          <div id="task-detail-modal" className="relative w-full max-w-4xl h-[92vh] sm:h-auto sm:max-h-[90vh] bg-[var(--surface)] border-t sm:border border-[var(--border)] rounded-t-[28px] sm:rounded-[32px] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden scale-in-center">
+          <div id="task-detail-modal" className="relative w-full max-w-4xl h-[calc(100dvh-3.5rem)] sm:h-auto sm:max-h-[88dvh] max-h-[calc(100dvh-3.5rem)] bg-[var(--surface)] border-t sm:border border-[var(--border)] rounded-t-[28px] sm:rounded-[32px] shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden scale-in-center pb-[max(env(safe-area-inset-bottom),0.5rem)]">
             <header className="h-14 sm:h-16 lg:h-20 border-b border-[var(--border)] px-3 sm:px-6 lg:px-8 flex items-center justify-between flex-shrink-0 bg-[var(--sidebar)]">
               <div className="flex items-center gap-2 sm:gap-4 min-w-0">
                 <button
@@ -1873,14 +1997,14 @@ export default function DashboardContent({
                 <h2 className="text-base sm:text-xl font-bold text-[var(--foreground)] truncate">Detalhes da Tarefa</h2>
               </div>
               <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 flex-shrink-0">
-                <button 
-                  onClick={() => openEditTask(selectedTaskForDetail)} 
-                  className="p-2 sm:px-3 sm:py-2 bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-xs sm:text-sm font-bold rounded-lg border border-[var(--border)] flex items-center gap-1.5 text-[#888] hover:text-[var(--foreground)] transition-all shadow-sm active:scale-95" 
+                <button
+                  onClick={() => openEditTask(selectedTaskForDetail)}
+                  className="p-2 sm:px-3 sm:py-2 bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-xs sm:text-sm font-bold rounded-lg border border-[var(--border)] flex items-center gap-1.5 text-[#888] hover:text-[var(--foreground)] transition-all shadow-sm active:scale-95"
                   title="Editar Tarefa"
                 >
                   <Edit2 size={13} /> <span className="hidden sm:inline">Editar</span>
                 </button>
-                <button 
+                <button
                   onClick={() => {
                     if (confirm("Excluir esta tarefa?")) {
                       const modalEl = document.getElementById("task-detail-modal");
@@ -1891,7 +2015,7 @@ export default function DashboardContent({
                         });
                       });
                     }
-                  }} 
+                  }}
                   className={cn(
                     "p-2 sm:px-3 sm:py-2 text-xs sm:text-sm font-bold rounded-lg border flex items-center gap-1.5 transition-all shadow-sm active:scale-95 group",
                     theme === 'light'
@@ -1900,13 +2024,13 @@ export default function DashboardContent({
                   )}
                   title="Excluir Tarefa"
                 >
-                  <Trash2 
-                    size={14} 
+                  <Trash2
+                    size={14}
                     className={cn(
                       "transition-colors",
                       theme === 'light' ? "text-red-700 group-hover:text-red-800" : "text-red-400 group-hover:text-red-300"
-                    )} 
-                  /> 
+                    )}
+                  />
                   <span className="hidden sm:inline">Excluir</span>
                 </button>
                 <button
@@ -1967,26 +2091,26 @@ export default function DashboardContent({
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="text-xs sm:text-sm font-bold text-[#888] uppercase tracking-widest flex items-center gap-2">
-                        <ListTodo size={16} className="text-[var(--accent)]" /> 
+                        <ListTodo size={16} className="text-[var(--accent)]" />
                         Ações Pendentes / Subtarefas {(selectedTaskForDetail.subtasks || []).length > 0 && (
                           <span className="text-[var(--foreground)]">
                             ({(selectedTaskForDetail.subtasks || []).filter(s => s.completed).length}/{(selectedTaskForDetail.subtasks || []).length})
                           </span>
                         )}
                       </h3>
-                      {(selectedTaskForDetail.subtasks || []).length > 0 && 
-                       (selectedTaskForDetail.subtasks || []).every(s => s.completed) && (
-                        <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-emerald-900/15 dark:bg-emerald-500/15 text-emerald-900 dark:text-emerald-300 border border-emerald-800/30 dark:border-emerald-500/30">
-                          Todas Concluídas
-                        </span>
-                      )}
+                      {(selectedTaskForDetail.subtasks || []).length > 0 &&
+                        (selectedTaskForDetail.subtasks || []).every(s => s.completed) && (
+                          <span className="px-2 py-0.5 text-[9px] font-black uppercase rounded bg-emerald-900/15 dark:bg-emerald-500/15 text-emerald-900 dark:text-emerald-300 border border-emerald-800/30 dark:border-emerald-500/30">
+                            Todas Concluídas
+                          </span>
+                        )}
                     </div>
                     <button
                       onClick={() => setIsAddingSubtask(!isAddingSubtask)}
                       className={cn(
                         "px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 shadow-lg border",
-                        isAddingSubtask 
-                          ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20" 
+                        isAddingSubtask
+                          ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
                           : "bg-[var(--surface-hover)] border-[var(--border)] text-[var(--foreground)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                       )}
                     >
@@ -2043,8 +2167,8 @@ export default function DashboardContent({
                             key={subtask.id}
                             className={cn(
                               "bg-[var(--surface)] border rounded-xl p-3 sm:p-4 transition-all group relative overflow-hidden",
-                              subtask.completed 
-                                ? "border-emerald-700/30 dark:border-emerald-500/30 bg-emerald-800/[0.04] dark:bg-emerald-500/[0.03]" 
+                              subtask.completed
+                                ? "border-emerald-700/30 dark:border-emerald-500/30 bg-emerald-800/[0.04] dark:bg-emerald-500/[0.03]"
                                 : "border-[var(--border)] hover:border-[var(--accent)]/40 shadow-sm"
                             )}
                           >
@@ -2220,8 +2344,8 @@ export default function DashboardContent({
                       onClick={() => setIsAddingLog(!isAddingLog)}
                       className={cn(
                         "px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] font-black uppercase rounded-lg transition-all flex items-center gap-1.5 sm:gap-2 active:scale-95 shadow-lg border",
-                        isAddingLog 
-                          ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20" 
+                        isAddingLog
+                          ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20"
                           : "bg-[var(--accent)] border-[var(--accent)] text-[var(--background)] hover:opacity-90"
                       )}
                     >
@@ -2349,7 +2473,7 @@ export default function DashboardContent({
                           onChange={(e) => handleFileChange(e, (url) => setTempLogAttachments(prev => [...prev, url]))}
                         />
                       </label>
-                      <button 
+                      <button
                         onClick={() => setIsAddingLog(false)}
                         className="p-1.5 text-[#555] hover:text-[var(--foreground)] transition-colors"
                         title="Fechar"
@@ -2436,7 +2560,7 @@ export default function DashboardContent({
 
       {isTaskModalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-3 sm:p-4">
-          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-md rounded-2xl p-5 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-md rounded-2xl p-5 sm:p-8 shadow-2xl max-h-[90dvh] overflow-y-auto">
             <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">{editingTask ? "Editar Tarefa" : "Nova Tarefa"}</h2>
             <div className="space-y-4">
               <div>
@@ -2466,8 +2590,8 @@ export default function DashboardContent({
                               <span className="text-[8px] font-black">{url.split('.').pop()?.split('?')[0].toUpperCase()}</span>
                             </div>
                           )}
-                          <button 
-                            onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))} 
+                          <button
+                            onClick={() => setTempTaskAttachments(prev => prev.filter((_, idx) => idx !== i))}
                             className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                           >
                             <X size={10} />
@@ -2527,7 +2651,7 @@ export default function DashboardContent({
       {/* MODAL DE NOVA NOTA */}
       {isNoteModalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-3 sm:p-4">
-          <div className="bg-[#fef9c3] p-5 sm:p-10 shadow-[20px_20px_60px_rgba(0,0,0,0.5)] relative rotate-0 sm:-rotate-1 w-full max-w-xl border-t-[24px] sm:border-t-[40px] border-amber-200/50 rounded-b-xl scale-in-center">
+          <div className="bg-[#fef9c3] p-5 sm:p-10 shadow-[20px_20px_60px_rgba(0,0,0,0.5)] relative rotate-0 sm:-rotate-1 w-full max-w-xl border-t-[24px] sm:border-t-[40px] border-amber-200/50 rounded-b-xl scale-in-center max-h-[90dvh] overflow-y-auto">
             <div className="hidden sm:block absolute -top-8 left-1/2 -translate-x-1/2 w-32 h-12 bg-white/40 backdrop-blur-sm -rotate-2 border border-white/20 shadow-sm z-10" />
             <button
               onClick={() => setIsNoteModalOpen(false)}
@@ -2573,8 +2697,8 @@ export default function DashboardContent({
       {/* MODAL DE CONFIGURAÇÕES E SEGURANÇA (TROCA DE SENHA) */}
       {isSettingsModalOpen && (
         <div className="fixed inset-0 z-[85] flex items-center justify-center bg-[var(--backdrop,rgba(0,0,0,0.6))] backdrop-blur-sm p-3 sm:p-4">
-          <div 
-            className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+          <div
+            className="w-full max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90dvh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Cabeçalho do Modal */}
