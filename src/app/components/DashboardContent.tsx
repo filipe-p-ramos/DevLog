@@ -2193,19 +2193,26 @@ export default function DashboardContent({
                                     className="w-full bg-[var(--background)] border border-[var(--border)] rounded-lg p-2.5 text-xs text-[var(--foreground)] focus:outline-none min-h-[70px]"
                                   />
                                 </div>
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    onClick={() => setEditingSubtaskId(null)}
-                                    className="px-3 py-1.5 text-[10px] font-bold uppercase text-[#888] hover:text-[var(--foreground)]"
-                                  >
-                                    Cancelar
-                                  </button>
-                                  <button
-                                    onClick={() => handleSaveEditSubtask(subtask.id)}
-                                    className="px-3 py-1.5 text-[10px] font-bold uppercase bg-[var(--accent)] text-[var(--background)] rounded-md hover:opacity-90 transition-opacity"
-                                  >
-                                    Salvar Alterações
-                                  </button>
+                                <div className="flex justify-between items-center pt-1">
+                                  {subtask.createdAt && !isNaN(new Date(subtask.createdAt).getTime()) ? (
+                                    <span className="text-[10px] font-bold text-[#777] dark:text-[#999]">
+                                      Criada em {new Date(subtask.createdAt).toLocaleString()}
+                                    </span>
+                                  ) : <span />}
+                                  <div className="flex justify-end gap-2">
+                                    <button
+                                      onClick={() => setEditingSubtaskId(null)}
+                                      className="px-3 py-1.5 text-[10px] font-bold uppercase text-[#888] hover:text-[var(--foreground)]"
+                                    >
+                                      Cancelar
+                                    </button>
+                                    <button
+                                      onClick={() => handleSaveEditSubtask(subtask.id)}
+                                      className="px-3 py-1.5 text-[10px] font-bold uppercase bg-[var(--accent)] text-[var(--background)] rounded-md hover:opacity-90 transition-opacity"
+                                    >
+                                      Salvar Alterações
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ) : (
@@ -2234,6 +2241,18 @@ export default function DashboardContent({
                                         subtask.completed ? "line-through text-[var(--foreground)] opacity-70" : "text-[var(--foreground)]"
                                       )}>
                                         {subtask.title}
+                                      </div>
+                                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                        {subtask.createdAt && !isNaN(new Date(subtask.createdAt).getTime()) && (
+                                          <span className="text-[10px] font-bold text-[#777] dark:text-[#999]">
+                                            Criada em {new Date(subtask.createdAt).toLocaleString()}
+                                          </span>
+                                        )}
+                                        {subtask.completed && subtask.completedAt && !subtask.resolutionNote && !isNaN(new Date(subtask.completedAt).getTime()) && (
+                                          <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400">
+                                            • Concluída em {new Date(subtask.completedAt).toLocaleString()}
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
                                   </div>

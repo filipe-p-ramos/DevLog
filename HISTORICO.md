@@ -301,6 +301,17 @@ A base de dados será orquestrada via schema prisma:
   - **Feedback Contextual no Estado Vazio:** Exibição da mensagem *"Nenhuma tarefa com ações pendentes neste projeto."* caso não haja itens correspondentes.
 - **Documentação Relacionada:** [doc/19_filtro_tarefas_com_acoes_pendentes.md](./doc/19_filtro_tarefas_com_acoes_pendentes.md)
 
+---
+
+### [2026-09-20] - Marco 20: Exibição de Data e Hora nas Subtarefas
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Inclusão da data e hora de criação e conclusão no cartão visual de cada subtarefa dentro do modal de detalhes da tarefa, fornecendo ao desenvolvedor transparência temporal e auditoria precisa das ações cadastradas.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Exibição na Listagem de Subtarefas (`DashboardContent.tsx`):** Renderizado o texto `Criada em DD/MM/AAAA, HH:MM:SS` logo abaixo do título de cada item, com tratamento defensivo de parsing e contraste ajustado para os temas claro e escuro.
+  - **Indicação Complementar de Conclusão:** Para subtarefas finalizadas sem nota técnica de resolução, incluída a indicação complementar `• Concluída em DD/MM/AAAA, HH:MM:SS` em verde esmeralda.
+  - **Integração no Modo de Edição:** Exibição do carimbo de criação original no rodapé do formulário de edição da subtarefa.
+- **Documentação Relacionada:** [doc/20_exibicao_data_hora_subtarefas.md](./doc/20_exibicao_data_hora_subtarefas.md)
+
+
 
 
 
