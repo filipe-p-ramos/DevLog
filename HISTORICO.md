@@ -311,6 +311,18 @@ A base de dados será orquestrada via schema prisma:
   - **Integração no Modo de Edição:** Exibição do carimbo de criação original no rodapé do formulário de edição da subtarefa.
 - **Documentação Relacionada:** [doc/20_exibicao_data_hora_subtarefas.md](./doc/20_exibicao_data_hora_subtarefas.md)
 
+---
+
+### [2026-09-20] - Marco 21: Motivo e Desfecho de Conclusão de Tarefas
+- **Status / Objetivo / Motivação:** Concluído com sucesso (Incremento Estável). Atendimento à solicitação de abertura de um campo para registro do parecer/motivo da conclusão ao clicar no botão "Concluir", e exibição deste texto em destaque na nota finalizada para referência futura.
+- **Decisões Técnicas / Ações Realizadas:**
+  - **Modelagem e Banco de Dados (Prisma & Supabase PostgreSQL):** Inclusão dos campos `conclusionNote` (motivo da finalização) e `completedAt` (timestamp preciso) na entidade `Task`. Aplicação não destrutiva com `npx prisma db push` e regeneração do Prisma Client com `npx prisma generate`.
+  - **Backend e Server Actions (`src/app/actions/tasks.ts`):** Atualização de `updateTaskStatus` com persistência relacional do motivo e controle de estado `completed` vs `pending`. Implementação da Server Action `updateTaskConclusionNote` para permitir a retificação ou enriquecimento do desfecho diretamente na nota concluída.
+  - **Experiência de Usuário e Conclusão Inline (`DashboardContent.tsx`):** Eliminação de modais sobrepostos e popups secundários. Ao clicar em "Concluir", a tela rola suavemente para o final da tarefa e abre o formulário inline de conclusão com foco e atalho `Ctrl+Enter`.
+  - **Comentário com Detalhe Verde no Final da Tarefa:** A conclusão é renderizada na lista de andamentos como um comentário em destaque com borda verde esmeralda, badge de conclusão, carimbo de data/hora e opção de edição inline rápida. Resumo verde preservado nos cards da listagem de tarefas concluídas.
+- **Documentação Relacionada:** [doc/21_motivo_conclusao_tarefas.md](./doc/21_motivo_conclusao_tarefas.md)
+
+
 
 
 

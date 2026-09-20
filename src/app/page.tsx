@@ -39,6 +39,8 @@ export default async function DevLogPage({
         attachments: t.attachments,
         status: t.status,
         tags: t.tags,
+        conclusionNote: t.conclusionNote,
+        completedAt: t.completedAt,
         createdAt: t.createdAt,
         subtasks: (t.subtasks || []).map(s => ({
           id: s.id,

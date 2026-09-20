@@ -64,10 +64,30 @@ export async function createTask(projectId: string, title: string, description: 
   revalidatePath("/");
 }
 
-export async function updateTaskStatus(id: string, status: string) {
+export async function updateTaskStatus(id: string, status: string, conclusionNote?: string | null) {
+  const isCompleted = status === "completed";
   await prisma.task.update({
     where: { id },
-    data: { status },
+    data: {
+      status,
+      completedAt: isCompleted ? new Date() : null,
+      conclusionNote: isCompleted
+        ? (conclusionNote !== undefined ? (conclusionNote?.trim() || null) : undefined)
+        : undefined,
+      updatedAt: new Date(),
+    },
+  });
+  revalidatePath("/");
+}
+
+export async function updateTaskConclusionNote(id: string, conclusionNote: string) {
+  const cleanNote = conclusionNote.trim();
+  await prisma.task.update({
+    where: { id },
+    data: {
+      conclusionNote: cleanNote || null,
+      updatedAt: new Date(),
+    },
   });
   revalidatePath("/");
 }

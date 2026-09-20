@@ -13,7 +13,7 @@ import {
 import { logout, changePassword } from "../actions/auth";
 import { createProject, updateProject, deleteProject, reorderProjects } from "../actions/projects";
 import {
-  createTask, createLog, updateTaskStatus,
+  createTask, createLog, updateTaskStatus, updateTaskConclusionNote,
   deleteTask, updateTask, updateLog, deleteLog,
   createSubtask, toggleSubtask, updateSubtask, deleteSubtask
 } from "../actions/tasks";
@@ -92,6 +92,8 @@ interface Task {
   attachments: string[];
   status: string;
   tags: string[];
+  conclusionNote?: string | null;
+  completedAt?: Date | string | null;
   subtasks?: Subtask[];
   logs: Log[];
   createdAt: Date | string;
@@ -159,6 +161,13 @@ export default function DashboardContent({
   const [editingSubtaskId, setEditingSubtaskId] = useState<string | null>(null);
   const [editingSubtaskTitle, setEditingSubtaskTitle] = useState("");
   const [editingSubtaskResolution, setEditingSubtaskResolution] = useState("");
+
+  // Estados de Conclusão / Motivo da Tarefa (Comentário verde no final da tarefa)
+  const [isCompletingInline, setIsCompletingInline] = useState(false);
+  const [inlineConclusionText, setInlineConclusionText] = useState("");
+  const [isEditingTaskConclusion, setIsEditingTaskConclusion] = useState(false);
+  const [editingTaskConclusionText, setEditingTaskConclusionText] = useState("");
+  const conclusionBoxRef = useRef<HTMLDivElement>(null);
 
   // Mapeamento de cores personalizadas (normalizado em maiúsculas)
   const [customTagColors, setCustomTagColors] = useState<Record<string, string>>(
@@ -394,6 +403,11 @@ export default function DashboardContent({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (isCompletingInline) {
+          setIsCompletingInline(false);
+          return;
+        }
+        setIsEditingTaskConclusion(false);
         setSelectedTaskId(null);
         setIsAddingLog(false);
         setIsProjectModalOpen(false);
@@ -408,7 +422,7 @@ export default function DashboardContent({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [isCompletingInline]);
 
   // Sincronização de Modais e Sidebar com o Gesto de Voltar do Android (History Popstate)
   const isAnyOverlayOpen = Boolean(
@@ -868,9 +882,21 @@ export default function DashboardContent({
     });
   };
 
+  const handleConfirmInlineComplete = (withNote: boolean = true) => {
+    if (!selectedTaskForDetail) return;
+    const task = selectedTaskForDetail;
+    const note = withNote ? inlineConclusionText.trim() : null;
+    setIsCompletingInline(false);
+    setInlineConclusionText("");
+
+    startTransition(async () => {
+      await updateTaskStatus(task.id, "completed", note);
+    });
+  };
+
   const handleToggleTask = (task: Task, e?: React.MouseEvent, closeDetailModal: boolean = false) => {
     const newStatus = task.status === "completed" ? "pending" : "completed";
-    const buttonEl = (e?.currentTarget as HTMLElement) || document.getElementById(`toggle-btn-${task.id}`);
+    const buttonEl = (e?.currentTarget as HTMLElement) || document.getElementById(closeDetailModal ? `modal-toggle-btn-${task.id}` : `toggle-btn-${task.id}`);
     const cardEl = document.getElementById(`task-card-${task.id}`);
 
     if (closeDetailModal) {
@@ -1179,6 +1205,16 @@ export default function DashboardContent({
                 <MessageSquare size={12} className="flex-shrink-0" />
                 <p className="text-xs truncate italic break-all">
                   {lastLog.content.replace(/!\[.*?\]\(.*?\)/g, "[Anexo]")}
+                </p>
+              </div>
+            )}
+
+            {viewMode === 'card' && task.status === 'completed' && task.conclusionNote && (
+              <div className="mt-2.5 p-2 sm:p-2.5 bg-emerald-950/[0.08] dark:bg-emerald-950/25 border border-emerald-800/25 dark:border-emerald-500/30 rounded-xl flex items-start gap-2 shadow-sm">
+                <CheckCircle2 size={13} className="text-emerald-700 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-[var(--foreground)] font-medium line-clamp-2 leading-relaxed">
+                  <strong className="not-italic text-emerald-900 dark:text-emerald-300 font-bold uppercase text-[10px] mr-1">Conclusão:</strong>
+                  <span className="italic">{task.conclusionNote}</span>
                 </p>
               </div>
             )}
@@ -2037,7 +2073,14 @@ export default function DashboardContent({
                   id={`modal-toggle-btn-${selectedTaskForDetail.id}`}
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleToggleTask(selectedTaskForDetail, e, true);
+                    if (selectedTaskForDetail.status === "completed") {
+                      handleToggleTask(selectedTaskForDetail, e, true);
+                    } else {
+                      setIsCompletingInline(true);
+                      setTimeout(() => {
+                        conclusionBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                      }, 50);
+                    }
                   }}
                   className={cn(
                     "px-2.5 py-2 sm:px-4 sm:py-2 text-xs sm:text-sm font-bold rounded-lg flex items-center gap-1.5 transition-all",
@@ -2439,6 +2482,142 @@ export default function DashboardContent({
                         )}
                       </div>
                     ))}
+
+                    {/* Campo Inline para Escrever a Conclusão da Tarefa */}
+                    {isCompletingInline && (
+                      <div
+                        ref={conclusionBoxRef}
+                        className="bg-emerald-950/[0.08] dark:bg-emerald-950/35 border-2 border-emerald-600/70 dark:border-emerald-500/70 rounded-2xl p-4 sm:p-5 shadow-lg space-y-3 animate-in fade-in zoom-in-95 duration-200 relative overflow-hidden"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="p-1 bg-emerald-700 dark:bg-emerald-600 text-white rounded-md shadow-sm">
+                              <CheckCircle2 size={15} strokeWidth={2.5} />
+                            </div>
+                            <span className="text-xs font-black uppercase text-emerald-950 dark:text-emerald-300 tracking-wider">
+                              Comentário de Conclusão da Tarefa
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setIsCompletingInline(false);
+                              setInlineConclusionText("");
+                            }}
+                            className="p-1 text-[#888] hover:text-[var(--foreground)] rounded-lg hover:bg-[var(--surface-hover)] transition-colors"
+                            title="Cancelar"
+                          >
+                            <X size={15} />
+                          </button>
+                        </div>
+
+                        <textarea
+                          autoFocus
+                          rows={3}
+                          value={inlineConclusionText}
+                          onChange={(e) => setInlineConclusionText(e.target.value)}
+                          placeholder="Escreva a conclusão ou desfecho desta tarefa... (ex: Testado no app v1.2, corrigido o bug de token)"
+                          className="w-full bg-[var(--surface)] border border-emerald-600/40 dark:border-emerald-500/40 focus:border-emerald-600 dark:focus:border-emerald-400 rounded-xl p-3 text-xs sm:text-sm text-[var(--foreground)] outline-none leading-relaxed shadow-inner"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                              e.preventDefault();
+                              handleConfirmInlineComplete(true);
+                            }
+                          }}
+                        />
+
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                          <span className="text-[10px] text-[#666] dark:text-[#aaa]">
+                            Dica: Use <kbd className="px-1 py-0.5 rounded bg-[var(--surface-hover)] border border-[var(--border)] font-mono text-[9px]">Ctrl</kbd> + <kbd className="px-1 py-0.5 rounded bg-[var(--surface-hover)] border border-[var(--border)] font-mono text-[9px]">Enter</kbd> para concluir
+                          </span>
+                          <div className="flex items-center gap-2 self-end">
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmInlineComplete(false)}
+                              className="px-2.5 py-1.5 text-[10px] sm:text-xs font-bold uppercase text-[#777] dark:text-[#aaa] hover:text-[var(--foreground)] transition-colors"
+                            >
+                              Concluir sem nota
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmInlineComplete(true)}
+                              className="px-3.5 py-1.5 text-[10px] sm:text-xs font-black uppercase bg-emerald-700 hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-lg transition-all shadow-md flex items-center gap-1.5"
+                            >
+                              <Check size={13} strokeWidth={3} /> Concluir Tarefa
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Comentário de Conclusão Persistido (com detalhe verde de conclusão no final da tarefa) */}
+                    {selectedTaskForDetail.status === "completed" && selectedTaskForDetail.conclusionNote && !isCompletingInline && (
+                      <div className="bg-emerald-950/[0.08] dark:bg-emerald-950/30 border-2 border-emerald-700/50 dark:border-emerald-500/50 rounded-2xl p-4 sm:p-5 shadow-md relative overflow-hidden">
+                        {/* Brilho sutil verde */}
+                        <div
+                          className="absolute top-0 right-0 w-32 h-32 opacity-10 pointer-events-none"
+                          style={{ background: "radial-gradient(circle at top right, #10b981, transparent)" }}
+                        />
+                        <div className="flex justify-between items-start mb-2 sm:mb-3">
+                          <div className="flex items-center gap-2 sm:gap-2.5">
+                            <div className="px-2.5 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-900 dark:text-emerald-300 border border-emerald-700/30 dark:border-emerald-500/30 flex items-center gap-1">
+                              <CheckCircle2 size={12} strokeWidth={2.5} className="text-emerald-700 dark:text-emerald-400" /> Conclusão da Tarefa
+                            </div>
+                            {selectedTaskForDetail.completedAt && (
+                              <span className="text-[10px] font-bold text-[#666] dark:text-[#aaa]">
+                                {new Date(selectedTaskForDetail.completedAt).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+
+                          {!isEditingTaskConclusion && (
+                            <button
+                              onClick={() => {
+                                setIsEditingTaskConclusion(true);
+                                setEditingTaskConclusionText(selectedTaskForDetail.conclusionNote || "");
+                              }}
+                              className="p-1.5 text-emerald-800 dark:text-emerald-400 hover:text-emerald-950 dark:hover:text-emerald-200 transition-colors"
+                              title="Editar conclusão"
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          )}
+                        </div>
+
+                        {isEditingTaskConclusion ? (
+                          <div className="space-y-2 mt-2">
+                            <textarea
+                              autoFocus
+                              className="w-full bg-[var(--surface)] border border-emerald-600/50 dark:border-emerald-500/50 rounded-lg p-3 text-xs sm:text-sm text-[var(--foreground)] focus:outline-none min-h-[80px]"
+                              value={editingTaskConclusionText}
+                              onChange={(e) => setEditingTaskConclusionText(e.target.value)}
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => setIsEditingTaskConclusion(false)}
+                                className="px-3 py-1 text-[10px] font-bold uppercase text-[#555] hover:text-[var(--foreground)] transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => {
+                                  startTransition(async () => {
+                                    await updateTaskConclusionNote(selectedTaskForDetail.id, editingTaskConclusionText);
+                                    setIsEditingTaskConclusion(false);
+                                  });
+                                }}
+                                className="px-3 py-1 text-[10px] font-bold uppercase bg-emerald-700 hover:bg-emerald-600 text-white rounded-md transition-colors flex items-center gap-1"
+                              >
+                                <Check size={11} strokeWidth={3} /> Salvar
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs sm:text-sm text-[var(--foreground)] font-medium leading-relaxed italic whitespace-pre-wrap">
+                            "{selectedTaskForDetail.conclusionNote}"
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </section>
               </div>
